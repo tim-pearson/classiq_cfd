@@ -1,11 +1,8 @@
----
-title: Quantum-Enhanced CFD Using Classiq's VQLS and HHL
-author: Timothy Edward Pearson, Alexandre Gallardo
----
-## Project Title  
+# **Exploring Hybrid Quantum-Classical Solvers in CFD Using Classiq’sVQLS and HHL**
 
-**Exploring Hybrid Quantum-Classical Solvers in CFD Using Classiq’s
-VQLS and HHL**
+### Timothy Edward Pearson, Alexandre Gallardo
+
+---
 
 ## Overview
 
@@ -32,6 +29,8 @@ includes:
 - A semi-Lagrangian advection solver  
 - A pressure projection step that solves a Poisson equation 
 - Real-time visualization of velocity and density fields  
+
+![](./images/windtunnel.jpeg)  
 
 This simulator offers a clean and flexible platform for integrating
 quantum solvers on reduced problem sizes (e.g., 4×4 or 8×8 grids).
