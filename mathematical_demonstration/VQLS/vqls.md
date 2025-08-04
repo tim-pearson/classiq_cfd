@@ -1,101 +1,87 @@
-# Solving a Linear System with a Variational Quantum Algorithm
+# Mathematical Foundations of VQLS with LCU Block Encoding
 
-Given a matrix $A$ and a vector $|\mathbf{b}\rangle$, the goal is to solve the linear equation:
+## Problem Formulation
+Given a matrix $A$ and vector $|b\rangle$, we seek $|x\rangle$ such that:
+$$A|x\rangle \propto |b\rangle$$
 
-$$
-A |\mathbf{x}\rangle = |\mathbf{b}\rangle
-$$
+The VQLS algorithm approximates the solution using a parameterized quantum circuit (ansatz):
+$$|x(\theta)\rangle = V(\theta)|0\rangle$$
 
-where $|\mathbf{x}\rangle$ is the solution vector we're trying to find.
+## Block Encoding via LCU
+For matrix $A$ expressed as a linear combination of unitaries:
+$$A = \sum_{l=0}^{L-1} c_l A_l$$
+where $c_l \geq 0$ and $\sum_l c_l = 1$.
 
----
+### Key Components:
 
-## Variational Ansatz
-
-Instead of solving this directly, a quantum algorithm tries to find an approximate solution by preparing a **parametrized quantum state**:
-
-$$
-|x\rangle = V(w) |0\rangle
-$$
-
-Here:
-
-- $V(w)$ is a unitary operation (a quantum circuit) that depends on parameters $w = (w_0, w_1, \dots)$.
-- $|0\rangle$ is the initial quantum state (all qubits in zero).
-- By tuning $w$, the algorithm tries to produce $|x\rangle$ that approximates the true solution.
-
----
-
-## Block Encoding of Matrix $A$
-
-We encode the matrix $A$ into a larger unitary matrix $U$ called a **block encoding**:
+1. **State Preparation**:
+   The coefficients $c_l$ of the linear combination are embedded into a quantum state via a unitary $U_c$. This prepares a superposition where each basis state $|l\rangle$ has amplitude $\sqrt{c_l}$:
 
 $$
-U = \begin{bmatrix} A & \cdot \\ \cdot & \cdot \end{bmatrix}
+|\sqrt{c}\rangle = U_c|0\rangle = \sum_{l=0}^{L-1} \sqrt{c_l}|l\rangle
 $$
 
-This means that $A$ appears as the top-left block of $U$. $U$ itself is unitary (quantum operations must be unitary), and $A$ might not be, so $U$ is constructed to embed $A$ inside a bigger unitary operator.
+   Here:
+   - $U_c$ is a unitary operator acting on $m = \lceil \log_2 L \rceil$ ancilla qubits.
+   - The state $|\sqrt{c}\rangle$ encodes the coefficients $c_l$ in its amplitudes.
+   - Normalization $\sum_l c_l = 1$ ensures valid quantum state preparation.
 
----
-
-## Preparing the State Related to $A$
-
-We then prepare the quantum state:
-
-$$
-|\Psi\rangle = \frac{A|x\rangle}{\sqrt{\langle x|A^\dagger A|x\rangle}}
-$$
-
-which is basically applying the matrix $A$ (embedded via $U$) to the variational state $|x\rangle$ and normalizing the result.
-
-Our goal is for $|\Psi\rangle$ to approximate the vector $|b\rangle$:
+2. **Controlled Unitaries**:
+   For each unitary $A_l$ in the LCU decomposition, we implement a controlled operation $CA_l$ that applies $A_l$ to the system register only when the ancilla register is in the corresponding state $|l\rangle$:
 
 $$
-|\Psi\rangle \approx |b\rangle
+CA_l |l'\rangle|\psi\rangle = 
+\begin{cases} 
+(A_l|\psi\rangle) \otimes |l\rangle & \text{if } l' = l \\
+|\psi\rangle \otimes |l'\rangle & \text{otherwise}
+\end{cases}
 $$
 
-where $|b\rangle$ is the normalized state corresponding to the right-hand side vector $|\mathbf{b}\rangle$.
+   Properties:
+   - Each $CA_l$ is a unitary operation on the combined system+ancilla space.
+   - The ancilla register acts as a control for selecting which $A_l$ to apply.
+   - When $l' \neq l$, the operation reduces to identity.
 
----
-
-## Cost Function to Optimize
-
-To measure how close $|\Psi\rangle$ is to $|b\rangle$, we use the cost function:
-
-$$
-C = 1 - |\langle b | \Psi \rangle|^2
-$$
-
-- If $|\Psi\rangle$ matches $|b\rangle$ perfectly, then the inner product $|\langle b | \Psi \rangle|^2 = 1$ and $C=0$ (minimum cost).
-- The algorithm tries to **minimize $C$** by adjusting parameters $w$ in $V(w)$.
-
----
-
-## Measuring Overlaps Using Probabilities
-
-In the quantum circuit, the overlap $|\langle b|\Psi\rangle|^2$ can be related to measurable probabilities:
+3. **Block Encoding Unitary**:
+   The complete block encoding unitary $U$ embeds the matrix $A$ in its top-left block while leaving other blocks arbitrary:
 
 $$
-|\langle b | \Psi \rangle|^2 = P(\mathrm{sys}=\mathrm{ground} \mid \mathrm{anc} = \mathrm{ground}) = \frac{P(\mathrm{all}=\mathrm{ground})}{P(\mathrm{anc}=\mathrm{ground})}
+U = \begin{bmatrix} 
+A & \cdot \\ 
+\cdot & \cdot 
+\end{bmatrix}
 $$
 
-- $P(\mathrm{sys}=\mathrm{ground} \mid \mathrm{anc} = \mathrm{ground})$ means the probability that the system qubits are in the ground state given the ancilla qubit is in the ground state.
-- $P(\mathrm{all}=\mathrm{ground})$ is the probability that all qubits (system + ancilla) are in the ground state.
-- This relation helps estimate the inner product by measuring outcomes on the quantum computer.
+   Key features:
+   - $U$ acts on the tensor product space of system and ancilla qubits.
+   - The block encoding satisfies $A = (\langle 0| \otimes I) U (|0\rangle \otimes I)$.
+   - The remaining blocks (marked as ·) can be arbitrary as long as $U$ remains unitary.
+   
+## Cost Function
 
----
+   The objective is to maximize overlap between $A|x(\theta)\rangle$ and $|b\rangle$:
+$$
+C(\theta) = 1 - |\langle b|\Psi(\theta)\rangle|^2$$
+  where:
+$$
+|\Psi(\theta)\rangle = \frac{A|x(\theta)\rangle}{\|A|x(\theta)\rangle\|}$$
 
-## Summary
+## Measurement Protocol
+The cost function is estimated via:
+1. Prepare the state $U_b^\dagger A V(\theta)|0\rangle$
+2. Measure probability of all qubits in $|0\rangle$ state:
+   $$P(0) = |\langle 0|U_b^\dagger A V(\theta)|0\rangle|^2 = |\langle b|\Psi(\theta)\rangle|^2$$
 
-- We want to solve $A|x\rangle = |b\rangle$.
-- Instead of direct inversion, we use a **variational quantum approach** that prepares a guess $|x\rangle = V(w)|0\rangle$.
-- We encode $A$ into a bigger unitary $U$.
-- Apply $A$ to $|x\rangle$ and normalize to get $|\Psi\rangle$.
-- We measure how close $|\Psi\rangle$ is to $|b\rangle$ using the cost function $C$.
-- By adjusting $w$, we minimize $C$.
-- The overlap is measured via certain quantum probabilities during the circuit run.
+## Classical Optimization
+Minimize $C(\theta)$ using classical optimizers (e.g., COBYLA):
+$$\theta^* = \text{argmin}_\theta C(\theta)$$
 
----
+## Solution Extraction
+The optimal state is:
+$$|x(\theta^*)\rangle = V(\theta^*)|0\rangle$$
+with probabilities:
+$$P(x_i) = |\langle x_i|x(\theta^*)\rangle|^2$$
 
-If you want, I can help you go even deeper into how each step is implemented on a quantum computer or how the optimization is done!
-
+## References
+[1] Bravo-Prieto et al., Variational Quantum Linear Solver (2019)  
+[2] Kothari, Efficient algorithms in quantum query complexity (2014)
