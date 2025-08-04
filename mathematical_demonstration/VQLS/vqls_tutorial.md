@@ -76,27 +76,20 @@ where:
 - $V(\omega)$: a **parameterized quantum circuit** (ansatz) acting on the system qubits that prepares the variational state $\ket{x} = V(\omega) \ket{0}$.
 - $U_b$: a **unitary operator** that prepares the state $\ket{b} = U_b \ket{0}$, representing the right-hand side of the equation $A \ket{x} \propto \ket{b}$.
 
+### Block Encoding for VQLS – Overview
 
-## Block Encoding For VQLS
+This function represents a core quantum routine in the Variational Quantum Linear Solver (VQLS) algorithm. It combines three key quantum operations to process and solve a linear system of equations $Ax = b$:
 
-```[python]
-from typing import List
+1. **Ansatz Application**  
+   The ansatz is a parameterized quantum circuit that encodes a candidate solution vector $x$ as a quantum state. Applying the ansatz prepares this trial state, which will be refined through optimization.
 
-import numpy as np
+2. **Block Encoding of Matrix $A$**  
+   The block encoding circuit embeds the matrix $A$ into a larger unitary operation on the quantum computer. This allows the algorithm to perform operations involving $A$ efficiently in a quantum-compatible form.
 
-from classiq import *
+3. **Inverse Preparation of the $b$ State**  
+   The preparation circuit creates the quantum state corresponding to the right-hand side vector $b$. Taking its inverse (adjoint) effectively "unprepares" this state, which is essential for measuring overlaps and performing certain transformations required by the solver.
 
-@qfunc
-def block_encoding_vqls(
-    ansatz: QCallable,
-    block_encoding: QCallable,
-    prepare_b_state: QCallable,
-) -> None:
-    ansatz()
-    block_encoding()
-    invert(lambda: prepare_b_state())
-```
-
+Together, these steps enable the quantum system to simulate the action of $A$ on $x$ and compare it to $b$, forming the basis for variational optimization to find the solution $x$. The function modularizes these components so they can be defined independently and combined flexibly depending on the problem setup.
 From here, we only need to define `ansatz`, `block_encoding`, and 
 `prepare_b_state` to fit the specific example above. Now we are 
 ready to build our model, synthesize it, execute it, and analyze 
@@ -120,7 +113,7 @@ To evaluate the conditional probabilty from the above, we construct
 a utility funtion
 
 
-# 🧠 Variational Quantum Linear Solver (VQLS) – Code-Specific Notes
+# Variational Quantum Linear Solver (VQLS) – Code-Specific Notes
 
 We aim to **variationally solve a linear system** $A \ket{x} = \ket{b}$ by minimizing the following **cost function**:
 
@@ -136,7 +129,7 @@ where:
 
 ---
 
-## 🧩 Overview of Class Components
+## Overview of Class Components
 
 ### Class Initialization
 
@@ -149,7 +142,7 @@ where:
 
 ---
 
-## 🔍 Conditional Probability Estimation
+## Conditional Probability Estimation
 
 - The circuit is executed and measurement results are parsed.
 - From the counts, we estimate the conditional probability:
@@ -164,7 +157,7 @@ shots where the auxiliary qubit is 0.
 
 ---
 
-## 📉 Cost Function
+## Cost Function
 
 - The cost is computed as:
 
@@ -181,7 +174,7 @@ $$
 
 ---
 
-## ⚙️ Optimization
+## Optimization
 
 - A classical optimizer (COBYLA) is used to minimize the cost function.
 - Initial values of parameters $\omega$ are randomly chosen in the range [0.0, 3.0].
@@ -200,8 +193,10 @@ $$
 
 ---
 
-## ✅ Summary
+## Summary
 
 - **Quantum step**: Execute a parameterized circuit, post-select on the auxiliary qubit, and compute the fidelity with the target state.
 - **Classical step**: Use a classical optimizer (COBYLA) to iteratively update parameters to minimize the cost function.
 - The process returns parameters that prepare a quantum state $\ket{\Psi(\omega^*)} \approx \ket{x}$, the solution to the linear system.
+
+
