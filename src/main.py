@@ -1,3 +1,4 @@
+from classiq.applications.chemistry import PauliOperator
 import matplotlib.pyplot as plt
 from classiq import (
     H,
@@ -17,6 +18,7 @@ from classiq import (
 )
 from classiq.applications.hamiltonian.pauli_decomposition import (
     hamiltonian_to_matrix,
+    matrix_to_pauli_operator,
 )
 from classiq.synthesis import synthesize
 import numpy as np
@@ -25,11 +27,27 @@ from ansatz import apply_fixed_3_qubit_system_ansatz
 from block_encoding import block_encoding_vqls
 from optimizer import VqlsOptimizer
 
+
 pauli_terms_structs = (
     0.55 * Pauli.I(0)
     + 0.225 * Pauli.I(0) * Pauli.Z(1) * Pauli.I(2)
     + 0.225 * Pauli.I(0) * Pauli.I(1) * Pauli.Z(2)
 )
+print(pauli_terms_structs)
+matrix_op = hamiltonian_to_matrix(pauli_terms_structs)
+
+# print(matrix_op)
+
+
+new_pauli = matrix_to_pauli_operator(matrix_op)
+print(new_pauli)
+new_pauli_structs = new_pauli
+print(new_pauli_structs)
+
+exit()
+
+# print(new_pauli)
+exit()
 normalization = sum([p.coefficient for p in pauli_terms_structs.terms])
 
 
