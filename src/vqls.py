@@ -116,6 +116,7 @@ class Vqls:
         normalization = sum(
             [p.coefficient for p in self.pauli_terms_structs.terms]
         )
+
         A_num = hamiltonian_to_matrix(self.pauli_terms_structs) / normalization
         b = np.ones(8) / np.sqrt(8)
 
@@ -134,7 +135,7 @@ class Vqls:
             ** 2,
         )
 
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7, 4))
+        _, (ax1, ax2) = plt.subplots(1, 2, figsize=(7, 4))
 
         ax1.bar(
             np.arange(0, 2**self.num_system_qubits),

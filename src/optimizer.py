@@ -55,7 +55,7 @@ class VqlsOptimizer:
             self.f,
             x0=[
                 float(random.randint(0, 3000)) / 1000
-                for i in range(0, self.ansatz_param_count)
+                for _ in range(0, self.ansatz_param_count)
             ],
             method="COBYLA",
             options={"maxiter": 2000},
