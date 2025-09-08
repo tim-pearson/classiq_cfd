@@ -1,14 +1,87 @@
+# %% [markdown]
+r"""
+
+# %% [markdown]"""
+
+# %% [markdown]
+r"""
+This tutorial covers an implementation example of a **Variational Quantum
+Linear Solver** [[1](#VQLS)] using block encoding. In particular, we use linear
+combinations of unitaries (LCUs) for the block encoding."""
+
+# %% [markdown]
+r"""
+## Building the Algorithm with Classiq
+
+### Quantum Part: Variational Circuit
+
+Given a block encoding of the matrix A:
+$$\begin{aligned}
+U = \begin{bmatrix} A & \cdot \\ \cdot & \cdot \end{bmatrix}
+\end{aligned} $$
+
+> we do this because if $A$ is not **unitary**, we can complete $\cdot$'s so
+
+> **From now on, we will use notataion $A$ but actually we mean the block of $A$
+encoding: $U$**
+
+
+we can prepare the state 
+$$|\Psi\rangle :=  A |x\rangle/\sqrt{\langle x |A^\dagger A |x\rangle}.$$
+> Where:  
+> $x$ : candidate solution vector(parametrized via a variational ansatz)
+
+
+We can approximate the solution $|x\rangle$ with a variational quantum
+circuit, i.e., a unitary circuit $V$, depending on a finite number of classical
+real parameters $w = (w_0, w_1, \dots)$:
+
+$$|x \rangle = V(w) |0\rangle.$$
+
+
+Our objective is to address the task of preparing a quantum state $|x\rangle$
+such that $A |x\rangle$ is proportional to $|b\rangle$; or, equivalently,
+ensuring that
+
+$$|\Psi\rangle :=  \frac{A |x\rangle}{\sqrt{\langle x |A^\dagger A |x\rangle}}
+\approx |b\rangle.$$
+
+The state $|b\rangle$ arises from a unitary operation $U_b$ applied to the
+ground state of $n$ qubits; i.e.,
+
+$$|b\rangle = U_b |0\rangle.$$
+
+To maximize the overlap between the quantum states $|\Psi\rangle$ and
+$|b\rangle$, we optimize the parameters, defining a cost function:
+
+$$C = 1- |\langle b | \Psi \rangle|^2.$$
+> Where:  
+> $|\braket{b|\psi}|^2$ : is the probability of measuring $\ket{b}$ when we are
+>in state $\ket{\psi}$  
+
+At a high level, the above could be implemented as follows:
+
+We construct a quantum model as depicted in the figure below. When measuring
+the circuit in the computational basis, the probability of
+finding the system qubits in the ground state (given the ancillary qubits
+measured
+in their ground state) is"""
+
+# %% [markdown]
+r""""""
 
 # %%
-
 from typing import List
 
 import numpy as np
 
 from classiq import *
+import classiq
+
+classiq.authenticate()
+
 
 # %%
-
 @qfunc
 def block_encoding_vqls(
     ansatz: QCallable,
@@ -19,8 +92,23 @@ def block_encoding_vqls(
     block_encoding()
     invert(lambda: prepare_b_state())
 
-# %%
 
+# %% [markdown]
+r"""
+From here, we only need to define `ansatz`, `block_encoding`, and"""
+
+# %% [markdown]
+r""""""
+
+# %% [markdown]
+r"""
+
+To variationally solve our linear problem, we define the
+cost function $C = 1- |\langle b | \Psi \rangle|^2$ that we are going to
+minimize. As explained above, we express it in terms of expectation
+values through Bayes\' theorem."""
+
+# %%
 import random
 
 import matplotlib.pyplot as plt
@@ -29,7 +117,12 @@ from scipy.optimize import minimize
 
 class VqlsOptimizer:
     def __init__(
-        self, qprog, ansatz_param_count, ansatz_var_name, aux_var_name, exe_prefs=None
+        self,
+        qprog,
+        ansatz_param_count,
+        ansatz_var_name,
+        aux_var_name,
+        exe_prefs=None,
     ):
         self.qprog = qprog
         self.ansatz_param_count = ansatz_param_count
@@ -54,7 +147,9 @@ class VqlsOptimizer:
     def my_cost(self, params):
         results = self.es.sample(params)
         return 1 - self.get_cond_prop(
-            results.parsed_counts_of_outputs([self.ansatz_var_name, self.aux_var_name])
+            results.parsed_counts_of_outputs(
+                [self.ansatz_var_name, self.aux_var_name]
+            )
         )
 
     def f(self, x):
@@ -79,7 +174,8 @@ class VqlsOptimizer:
         self._out_f = out_f = [out["x"][0 : self.ansatz_param_count]]
         print(out_f)
         plt.plot(
-            [l for l in range(len(self.intermediate))], list(self.intermediate.values())
+            [l for l in range(len(self.intermediate))],
+            list(self.intermediate.values()),
         )
 
         return {
@@ -87,8 +183,39 @@ class VqlsOptimizer:
             for k in range(self.ansatz_param_count)
         }
 
-# %%
 
+# %% [markdown]
+r"""
+***
+Once the optimal variational weights `w` are found, we
+can generate the quantum state $|x\rangle$. By measuring $|x\rangle$ in"""
+
+# %% [markdown]
+r"""
+## Example Using LCU Block Encoding
+
+We treat a specific example based on a system of three qubits:
+
+$$
+\begin{align}
+A  &=  c_0 A_0 + c_1 A_1 + c_2 A_2 = \ 0.55 \mathbb{I} \ + \ 0.225 Z_1 \ + \
+0.225 Z_2
+\\
+\\
+|b\rangle &= U_b |0 \rangle = H_0  H_1  H_2 |0\rangle,
+\end{align}
+$$
+"""
+
+# %% [markdown]
+r"""
+To block encode the matrix A we use the LCU method. This can be done with the
+`lcu_paulis` library function. Note that this function can get a unnormalized
+Pauli operator, thus we calculate the normalization factor for the post-process
+analysis.
+The LCU quantum circuit looks as follows:"""
+
+# %%
 pauli_terms_structs = (
     0.55 * Pauli.I(0)
     + 0.225 * Pauli.I(0) * Pauli.Z(1) * Pauli.I(2)
@@ -100,8 +227,18 @@ num_system_qubits = pauli_terms_structs.num_qubits
 num_ancila_qubits = (len(pauli_terms_structs.terms) - 1).bit_length()
 ansatz_param_count = 9
 
-# %%
+# %% [markdown]
+r"""
+### Fixed Hardware Ansatz
 
+Let's consider our ansatz $V(w)$, such that 
+
+$$|x\rangle = V(w) |0\rangle.$$
+
+
+This allows us to "search" the state space by varying a set of parameters, $w$. """
+
+# %%
 @qfunc
 def apply_ry_on_all(params: CArray[CReal], io: QArray[QBit]):
     repeat(count=io.len, iteration=lambda index: RY(params[index], io[index]))
@@ -127,11 +264,15 @@ def apply_fixed_3_qubit_system_ansatz(
     CZ(system_qubits[1], system_qubits[0])
     apply_ry_on_all([angles[6], angles[7], angles[8]], system_qubits)
 
+
+
+
 # %%
 
 @qfunc
 def main(
-    params: CArray[CReal, ansatz_param_count], system_qubits: Output[QArray[QBit]]
+    params: CArray[CReal, ansatz_param_count],
+    system_qubits: Output[QArray[QBit]],
 ):
     allocate(3, system_qubits)
     apply_fixed_3_qubit_system_ansatz(params, system_qubits)
@@ -140,8 +281,18 @@ def main(
 qprog_1 = synthesize(main)
 show(qprog_1)
 
-# %%
+# %% [markdown]"""
 
+# %% [markdown]
+r"""
+This is called a **fixed hardware ansatz** in that the configuration of quantum
+gates remains the same for each run of the circuit, and all that changes are
+the parameters. Unlike the QAOA ansatz, it is not composed solely of"""
+
+# %% [markdown]
+r""""""
+
+# %%
 @qfunc
 def main(
     params: CArray[CReal, ansatz_param_count],
@@ -153,25 +304,32 @@ def main(
     allocate(system_qubits)
 
     block_encoding_vqls(
-        ansatz=lambda: apply_fixed_3_qubit_system_ansatz(params, system_qubits),
+        ansatz=lambda: apply_fixed_3_qubit_system_ansatz(
+            params, system_qubits
+        ),
         block_encoding=lambda: lcu_pauli(
-            operator=pauli_terms_structs, data=system_qubits, block=ancillary_qubits
+            operator=pauli_terms_structs,
+            data=system_qubits,
+            block=ancillary_qubits,
         ),
         prepare_b_state=lambda: apply_to_all(H, system_qubits),
     )
 
-# %%
 
+# %%
 qprog_2 = synthesize(main)
 show(qprog_2)
 
 # %%
+write_qmod(
+    main, name="vqls_with_lcu", decimal_precision=15, symbolic_only=False
+)
 
-write_qmod(main, name="vqls_with_lcu", decimal_precision=15, symbolic_only=False)
 
 # %%
-
-backend_preferences = ClassiqBackendPreferences(backend_name="simulator_statevector")
+backend_preferences = ClassiqBackendPreferences(
+    backend_name="simulator_statevector"
+)
 execution_preferences = ExecutionPreferences(
     num_shots=204800, backend_preferences=backend_preferences
 )
@@ -186,7 +344,6 @@ optimizer = VqlsOptimizer(
 optimal_params = optimizer.optimize()
 
 # %%
-
 @qfunc
 def main(io: Output[QNum[num_system_qubits]]):
     allocate(io)
@@ -195,18 +352,13 @@ def main(io: Output[QNum[num_system_qubits]]):
 
 qprog_3 = synthesize(main)
 
-# %%
-
 with ExecutionSession(qprog_3, execution_preferences) as es:
     results = es.sample()
 
 df = results.dataframe
 
-# %%
-
 amplitudes = np.zeros(2**num_system_qubits).astype(complex)
 amplitudes[df.io] = df.amplitude
-# Preprocessed quantum solution: we know the solution is real, and that the last point is positive
 global_phase = np.angle(amplitudes[-1])
 amplitudes = np.real(amplitudes / np.exp(1j * global_phase))
 if (
@@ -215,31 +367,32 @@ if (
     amplitudes *= -1
 print(amplitudes)
 
-# %%
-
 probabilities = amplitudes**2
 
-# %%
+# %%markdown]
+r"""
+### Comparing to the Classical Solution"""
 
+
+# %%
 A_num = hamiltonian_to_matrix(pauli_terms_structs) / normalization
 b = np.ones(8) / np.sqrt(8)
 
-# %%
 
+# %%
 A_inv = np.linalg.inv(A_num)
 x = np.dot(A_inv, b)
 classical_probs = np.real((x / np.linalg.norm(x))) ** 2
 classical_probs
 
 # %%
-
 print(
     "overlap =",
-    (b.dot(A_num.dot(amplitudes) / (np.linalg.norm(A_num.dot(amplitudes))))) ** 2,
+    (b.dot(A_num.dot(amplitudes) / (np.linalg.norm(A_num.dot(amplitudes)))))
+    ** 2,
 )
 
 # %%
-
 import matplotlib.pyplot as plt
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7, 4))
@@ -255,3 +408,6 @@ ax2.set_xlabel("Hilbert space basis")
 ax2.set_title("Quantum probabilities")
 
 plt.show()
+
+# %% [markdown]
+r""""""
