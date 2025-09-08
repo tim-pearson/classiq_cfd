@@ -1,4 +1,4 @@
-# **Exploring Hybrid Quantum-Classical Solvers in CFD Using Classiq’sVQLS and HHL**
+# **Exploring Hybrid Quantum-Classical Solvers in CFD with Classiq’s VQLS and HHL**
 
 ### Timothy Edward Pearson, Alexandre Gallardo
 
@@ -6,7 +6,8 @@
 
 ## Overview
 
-We aim to investigate how hybrid quantum-classical algorithms can enhance scientific simulations
+We aim to investigate how hybrid quantum-classical algorithms can enhance
+scientific simulations
 — particularly in Computational Fluid Dynamics (CFD).
 
 This project will leverage
@@ -30,7 +31,7 @@ includes:
 - A pressure projection step that solves a Poisson equation 
 - Real-time visualization of velocity and density fields  
 
-![](./images/windtunnel.jpeg)  
+![](./images/figure1.png)  
 
 This simulator offers a clean and flexible platform for integrating
 quantum solvers on reduced problem sizes (e.g., 4×4 or 8×8 grids).
@@ -82,7 +83,8 @@ problem is tractable on simulators or small quantum devices
 under different solvers  
 - Highlight and annotate regions of the domain where quantum solvers
 were applied (e.g., small grid sections)  
-- Include side-by-side video outputs for classical, VQLS, and HHL-enhanced simulations  
+- Include side-by-side video outputs for classical, VQLS, and HHL-enhanced
+simulations  
 
 ## Potential Extensions
 
@@ -116,4 +118,3 @@ into the current capabilities and limitations of quantum approaches in
 engineering simulation. Visual comparisons will help contextualize
 solver performance beyond raw metrics, highlighting potential future
 applications of quantum computing in CFD and related domains.
-
