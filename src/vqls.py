@@ -18,6 +18,7 @@ from classiq import (
     lcu_pauli,
     qfunc,
     write_qmod,
+    inplace_prepare_state,
 )
 from classiq.applications.hamiltonian.pauli_decomposition import (
     hamiltonian_to_matrix,
@@ -32,15 +33,19 @@ from optimizer import VqlsOptimizer
 
 
 class Vqls:
-    def __init__(self, ansatz_param_count, pauli_terms_structs):
+    def __init__(self, ansatz_param_count, pauli_terms_structs, b):
         self.num_system_qubits = pauli_terms_structs.num_qubits
         self.num_ancila_qubits = (
             len(pauli_terms_structs.terms) - 1
         ).bit_length()
         self.ansatz_param_count = ansatz_param_count
         self.pauli_terms_structs = pauli_terms_structs
+        b /= np.linalg.norm(b)
+        self.b = b
+        self.probs = (b**2) / np.sum(b**2)
 
     def create_qrog(self, qmod_file=False):
+
         @qfunc
         def main(
             params: CArray[CReal, self.ansatz_param_count],
@@ -60,7 +65,12 @@ class Vqls:
                     data=system_qubits,
                     block=ancillary_qubits,
                 ),
-                prepare_b_state=lambda: apply_to_all(H, system_qubits),
+                prepare_b_state=lambda: inplace_prepare_state(
+                    probabilities=self.probs,
+                    bound=0.01,
+                    target=system_qubits,
+                ),
+                # prepare_b_state=lambda: apply_to_all(H, system_qubits),
             )
 
         self.qprog_2 = synthesize(main, auto_show=False)
@@ -76,6 +86,11 @@ class Vqls:
         backend_preferences = ClassiqBackendPreferences(
             backend_name="simulator_statevector"
         )
+        # backend_preferences = IBMBackendPreferences(
+        #     backend_name="ibmq_qasm_simulator",  # or "ibm_oslo" if you want real hardware
+        #     access_token="0d2E7JXA37URkqrCW5RuUU6zJTQMsU0A-LqERjLFId52",
+        #     channel="ibm_quantum",
+        # )
         self.execution_preferences = ExecutionPreferences(
             num_shots=num_shots, backend_preferences=backend_preferences
         )
@@ -104,39 +119,49 @@ class Vqls:
     def compare_results(self):
         df = self.results.dataframe
 
+        # Reconstruct amplitudes from quantum measurements
         amplitudes = np.zeros(2**self.num_system_qubits).astype(complex)
         amplitudes[df.io] = df.amplitude
+
+        # Remove global phase
         global_phase = np.angle(amplitudes[-1])
-        amplitudes = np.real(amplitudes / np.exp(1j * global_phase))
+        amplitudes = amplitudes / np.exp(1j * global_phase)
+        amplitudes = np.real(amplitudes)  # If you only want real part
+
         if amplitudes[-1] < 0:
             amplitudes *= -1
 
         self.quantum_probs = amplitudes**2
 
+        # Classical normalization for comparison
         normalization = sum(
             [p.coefficient for p in self.pauli_terms_structs.terms]
         )
-
         A_num = hamiltonian_to_matrix(self.pauli_terms_structs) / normalization
-        b = np.ones(8) / np.sqrt(8)
+        b = self.b
 
+        # Classical solution
         A_inv = np.linalg.inv(A_num)
-        x = np.dot(A_inv, b)
-        self.classical_probs = np.real((x / np.linalg.norm(x))) ** 2
-
-        print(
-            "overlap =",
-            (
-                b.dot(
-                    A_num.dot(amplitudes)
-                    / (np.linalg.norm(A_num.dot(amplitudes)))
-                )
-            )
-            ** 2,
+        x_classical = np.dot(A_inv, b)
+        self.classical_probs = (
+            np.real((x_classical / np.linalg.norm(x_classical))) ** 2
         )
 
-        _, (ax1, ax2) = plt.subplots(1, 2, figsize=(7, 4))
+        # Compute estimated x from quantum ansatz
+        x_estimated = amplitudes / np.linalg.norm(amplitudes)
+        print("Estimated vector x from quantum ansatz:")
+        print(x_estimated)
 
+        # Overlap
+        overlap = (
+            b.dot(
+                A_num.dot(amplitudes) / (np.linalg.norm(A_num.dot(amplitudes)))
+            )
+        ) ** 2
+        print("Overlap:", overlap)
+
+        # Plotting
+        _, (ax1, ax2) = plt.subplots(1, 2, figsize=(7, 4))
         ax1.bar(
             np.arange(0, 2**self.num_system_qubits),
             self.classical_probs,

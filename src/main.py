@@ -1,4 +1,5 @@
 from classiq import Pauli
+import numpy as np
 
 from vqls import Vqls
 
@@ -10,11 +11,14 @@ pauli_terms_structs = (
 )
 
 ansatz_param_count = 9
-vqls = Vqls(ansatz_param_count, pauli_terms_structs)
+
+
+x= np.array([0.2, 0.1, 0.3, 0.15, 0.05, 0.1, 0.05, 0.05])
+vqls = Vqls(ansatz_param_count, pauli_terms_structs, x)
 print("creating qprog")
 vqls.create_qrog()
 print("init optimizer")
-vqls.init_optimizer(2048)
+vqls.init_optimizer(204800)
 print("optimizing")
 optimal_params = vqls.optimizer.optimize()
 print("evalutating ansatz")
