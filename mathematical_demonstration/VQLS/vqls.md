@@ -1,5 +1,7 @@
 # Mathematical Foundations of VQLS with LCU Block Encoding
 
+### Timothy Pearson
+
 ## Goal
 
 We aim to solve a system of linear equations in the form:

@@ -1,5 +1,8 @@
 # VqlsOptimizer: Function Math Walkthrough
 
+
+### Timothy Pearson
+
 ## __init__(...)
 - Sets up the optimizer and execution session.
 - Maps Python objects to your **quantum program**.
