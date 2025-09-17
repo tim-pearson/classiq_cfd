@@ -85,6 +85,7 @@ $$
 ---
 
 ## optimize()
+
 - Runs classical optimizer (COBYLA) to minimize:
 $$
   \min_w C(w) = \min_w \left[ 1 - |\langle b | \Psi(w) \rangle|^2 \right]
