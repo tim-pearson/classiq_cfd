@@ -35,7 +35,9 @@ class VqlsOptimizer:
         return all_prob_0 / aux_prob_0
 
     def my_cost(self, params):
+
         results = self.es.sample(params)
+
         return 1 - self.get_cond_prop(
             results.parsed_counts_of_outputs(
                 [self.ansatz_var_name, self.aux_var_name]

@@ -1,3 +1,4 @@
+import os
 from classiq import allocate, qfunc
 from classiq.applications.chemistry import PauliOperator
 from classiq import IBMBackendPreferences
@@ -43,6 +44,7 @@ class Vqls:
         b /= np.linalg.norm(b)
         self.b = b
         self.probs = (b**2) / np.sum(b**2)
+        self.backend = None
 
     def create_qrog(self, qmod_file=False):
 
@@ -82,15 +84,7 @@ class Vqls:
                 symbolic_only=False,
             )
 
-    def init_optimizer(self, num_shots=204800):
-        backend_preferences = ClassiqBackendPreferences(
-            backend_name="simulator_statevector"
-        )
-        # backend_preferences = IBMBackendPreferences(
-        #     backend_name="ibmq_qasm_simulator",  # or "ibm_oslo" if you want real hardware
-        #     access_token="0d2E7JXA37URkqrCW5RuUU6zJTQMsU0A-LqERjLFId52",
-        #     channel="ibm_quantum",
-        # )
+    def init_optimizer(self, num_shots=204800, backend_preferences=None):
         self.execution_preferences = ExecutionPreferences(
             num_shots=num_shots, backend_preferences=backend_preferences
         )
