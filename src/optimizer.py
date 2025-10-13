@@ -60,7 +60,7 @@ class VqlsOptimizer:
                 for _ in range(0, self.ansatz_param_count)
             ],
             method="COBYLA",
-            options={"maxiter": 2000},
+            options={"maxiter": 100},
         )
         print(out)
         self._out_f = out_f = [out["x"][0 : self.ansatz_param_count]]
