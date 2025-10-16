@@ -23,6 +23,7 @@ class VqlsOptimizer:
         else:
             self.es = ExecutionSession(qprog, exe_prefs)
         self.intermediate = {}
+        self.count = 0
 
     def get_cond_prop(self, res):
         aux_prob_0 = 0
@@ -36,6 +37,7 @@ class VqlsOptimizer:
 
     def my_cost(self, params):
 
+        self.count += 1
         results = self.es.sample(params)
 
         return 1 - self.get_cond_prop(
@@ -60,7 +62,7 @@ class VqlsOptimizer:
                 for _ in range(0, self.ansatz_param_count)
             ],
             method="COBYLA",
-            options={"maxiter": 100},
+            options={"maxiter": 2000},
         )
         print(out)
         self._out_f = out_f = [out["x"][0 : self.ansatz_param_count]]

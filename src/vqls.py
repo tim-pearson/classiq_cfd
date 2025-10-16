@@ -162,6 +162,7 @@ class Vqls:
         # 🧾 Display both vectors
         print("\n=== Comparison of Vectors ===")
         print(f"b vector:        {np.round(b, 4)}")
+        print(f"Cost count: {self.optimizer.count}")
         print(f"x_classical:     {np.round(x_classical, 4)}")
         print(f"x_estimated(q):  {np.round(x_estimated, 4)}")
 
