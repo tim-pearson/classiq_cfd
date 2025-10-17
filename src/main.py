@@ -42,7 +42,8 @@ pauli_terms_structs = (
 ansatz_param_count = 9
 
 
-b = np.array([0.2, 0.1, 0.3, 0.15, 0.05, 0.1, 0.05, 0.05])
+# b = np.array([0.2, 0.1, 0.3, 0.15, 0.05, 0.1, 0.05, 0.05])
+b = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
 vqls = Vqls(ansatz_param_count, pauli_terms_structs, b)
 print("creating qprog")
 vqls.create_qrog()

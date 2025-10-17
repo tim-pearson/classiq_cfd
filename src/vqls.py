@@ -67,12 +67,12 @@ class Vqls:
                     data=system_qubits,
                     block=ancillary_qubits,
                 ),
-                prepare_b_state=lambda: inplace_prepare_state(
-                    probabilities=self.probs,
-                    bound=0.01,
-                    target=system_qubits,
-                ),
-                # prepare_b_state=lambda: apply_to_all(H, system_qubits),
+                # prepare_b_state=lambda: inplace_prepare_state(
+                #     probabilities=self.probs,
+                #     bound=0.01,
+                #     target=system_qubits,
+                # ),
+                prepare_b_state=lambda: apply_to_all(H, system_qubits),
             )
 
         self.qprog_2 = synthesize(main, auto_show=False)
@@ -146,6 +146,7 @@ class Vqls:
         normalization = sum(p.coefficient for p in self.pauli_terms_structs.terms)
         A_num = hamiltonian_to_matrix(self.pauli_terms_structs) / normalization
         b = self.b
+
 
         # Classical solution
         A_inv = np.linalg.inv(A_num)
