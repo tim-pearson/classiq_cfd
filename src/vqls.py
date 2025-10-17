@@ -67,12 +67,12 @@ class Vqls:
                     data=system_qubits,
                     block=ancillary_qubits,
                 ),
-                # prepare_b_state=lambda: inplace_prepare_state(
-                #     probabilities=self.probs,
-                #     bound=0.01,
-                #     target=system_qubits,
-                # ),
-                prepare_b_state=lambda: apply_to_all(H, system_qubits),
+                prepare_b_state=lambda: inplace_prepare_state(
+                    probabilities=self.probs,
+                    bound=0.01,
+                    target=system_qubits,
+                ),
+                # prepare_b_state=lambda: apply_to_all(H, system_qubits),
             )
 
         self.qprog_2 = synthesize(main, auto_show=False)
@@ -176,6 +176,7 @@ class Vqls:
         # Overlap
         overlap = (b.dot(A_num.dot(amplitudes)) / np.linalg.norm(A_num.dot(amplitudes)))**2
         print(f"Overlap: {overlap:.6f}\n")
+        alpha = np.dot(x_classical, x_estimated) / np.dot(x_estimated, x_estimated)
 
 
         # Plot

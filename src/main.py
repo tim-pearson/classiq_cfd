@@ -4,12 +4,13 @@ import matplotlib.pyplot as plt
 from classiq import ClassiqBackendPreferences, IBMBackendPreferences, Pauli
 from classiq.applications.hamiltonian.pauli_decomposition import (
     hamiltonian_to_matrix,
+    matrix_to_pauli_operator,
 )
 import numpy as np
 from classiq import ClassiqBackendPreferences, ClassiqNvidiaBackendNames
 from pandas.io.formats.style import plt
 
-from backend_preferences import get_ibm_backends
+# from backend_preferences import get_ibm_backends
 from optimizer import VqlsOptimizer
 from vqls import Vqls
 from dotenv import load_dotenv
@@ -41,9 +42,13 @@ pauli_terms_structs = (
 
 ansatz_param_count = 9
 
+A = hamiltonian_to_matrix(pauli_terms_structs)
 
-# b = np.array([0.2, 0.1, 0.3, 0.15, 0.05, 0.1, 0.05, 0.05])
-b = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
+pauli_terms_structs = matrix_to_pauli_operator(A)
+
+# %%
+
+b = np.array([0.2, 0.1, 0.3, 0.15, 0.05, 0.1, 0.05, 0.05])
 vqls = Vqls(ansatz_param_count, pauli_terms_structs, b)
 print("creating qprog")
 vqls.create_qrog()
