@@ -31,11 +31,15 @@ import numpy as np
 from ansatz import apply_fixed_3_qubit_system_ansatz
 from block_encoding import block_encoding_vqls
 from optimizer import VqlsOptimizer
+from utils import plot_classical_vs_quantum, save_stats_to_json
+
+DATA_DIR = "data/"
 
 
 class Vqls:
-    def __init__(self, ansatz_param_count, pauli_terms_structs, b, A):
-        self.A =A
+    def __init__(self, ansatz_param_count, pauli_terms_structs, b, name):
+        self.name = name
+        self.A = hamiltonian_to_matrix(pauli_terms_structs)
         self.num_system_qubits = pauli_terms_structs.num_qubits
         self.num_ancila_qubits = (
             len(pauli_terms_structs.terms) - 1
@@ -45,7 +49,6 @@ class Vqls:
         b /= np.linalg.norm(b)
         self.b = b
         self.probs = (b**2) / np.sum(b**2)
-        # self.probs =np.linalg.norm(b)
         self.backend = None
 
     def create_qrog(self, qmod_file=False):
@@ -111,8 +114,8 @@ class Vqls:
 
         with ExecutionSession(qprog_3, self.execution_preferences) as es:
             self.results = es.sample()
-    def compare_results(self):
 
+    def compare_results(self):
         N = 2**self.num_system_qubits
 
         # --- 1) Get quantum amplitudes and probabilities ---
@@ -143,26 +146,26 @@ class Vqls:
             np.linalg.norm(probabilities) * np.linalg.norm(classical_probs)
         )
 
+        # Store stats in a dictionary
+        stats = {
+            "iterations": self.optimizer.count,
+            "overlap": float(np.real(overlap)),
+            "mse": float(np.real(mse)),
+            "cosine_similarity": float(np.real(cosine_similarity)),
+            "classical_probs": classical_probs.tolist(),
+            "quantum_probs": probabilities.tolist()
+        }
+
         # Print metrics
-        print(f"Overlap = {np.real(overlap):.6f}")
-        print(f"MSE = {np.real(mse):.6e}")
-        print(f"Cosine similarity = {np.real(cosine_similarity):.6f}")
+        print(f"Iterations = {stats['iterations']}")
+        print(f"Overlap = {stats['overlap']:.6f}")
+        print(f"MSE = {stats['mse']:.6e}")
+        print(f"Cosine similarity = {stats['cosine_similarity']:.6f}")
 
-        # --- 4) Plot classical vs quantum probabilities on the same scale ---
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
+        # --- 4) Save stats to JSON ---
+        save_stats_to_json(stats, self.name, folder="data")
 
-        bar_width = 0.6
-        x_indices = np.arange(N)
+        # --- 5) Plot ---
+        plot_classical_vs_quantum(classical_probs, probabilities, self.name)
 
-        ax1.bar(x_indices, classical_probs, width=bar_width, color="#1f77b4", alpha=0.8)
-        ax1.set_xlabel("Vector space basis")
-        ax1.set_ylabel("Probability")
-        ax1.set_title("Classical probabilities")
-
-        ax2.bar(x_indices, probabilities, width=bar_width, color="#ff7f0e", alpha=0.8)
-        ax2.set_xlabel("Hilbert space basis")
-        ax2.set_title("Quantum probabilities")
-
-        plt.tight_layout()
-        plt.show()
-
+        return stats
