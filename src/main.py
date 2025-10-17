@@ -59,7 +59,7 @@ print(A_old)
 # b = np.array([0.2, 0.1, 0.3, 0.15, 0.05, 0.1, 0.05, 0.05])  
 # b /= np.linalg.norm(b)
 b = np.ones(8) / np.sqrt(8)
-vqls = Vqls(ansatz_param_count, pauli_terms_structs_old, b, A_old)
+vqls = Vqls(ansatz_param_count, pauli_terms_structs_new, b, A_new)
 print("creating qprog")
 vqls.create_qrog()
 print("init optimizer")
@@ -71,4 +71,3 @@ vqls.evaluate_ansatz(optimal_params)
 print("comparing results")
 vqls.compare_results()
 # %%
-

@@ -112,6 +112,7 @@ class Vqls:
         with ExecutionSession(qprog_3, self.execution_preferences) as es:
             self.results = es.sample()
     def compare_results(self):
+
         N = 2**self.num_system_qubits
 
         # --- 1) Get quantum amplitudes and probabilities ---
@@ -129,30 +130,39 @@ class Vqls:
         self.quantum_probs = probabilities
 
         # --- 2) Classical solution ---
-        normalization = sum(p.coefficient for p in self.pauli_terms_structs.terms)
         A_num = self.A
         b = np.ones(N) / np.sqrt(N)  # uniform RHS
-        A_inv = np.linalg.inv(A_num)
-        x = A_inv @ b
+        x = np.linalg.solve(A_num, b)
         classical_probs = np.real((x / np.linalg.norm(x)))**2
         self.classical_probs = classical_probs
 
-        # --- 3) Compute overlap ---
+        # --- 3) Compute statistics ---
         overlap = (b.dot(A_num.dot(amplitudes) / np.linalg.norm(A_num.dot(amplitudes))))**2
-        print("overlap =", overlap)
+        mse = np.mean((amplitudes - x / np.linalg.norm(x))**2)
+        cosine_similarity = np.dot(probabilities, classical_probs) / (
+            np.linalg.norm(probabilities) * np.linalg.norm(classical_probs)
+        )
 
-        # --- 4) Plot classical vs quantum probabilities ---
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7, 4))
+        # Print metrics
+        print(f"Overlap = {np.real(overlap):.6f}")
+        print(f"MSE = {np.real(mse):.6e}")
+        print(f"Cosine similarity = {np.real(cosine_similarity):.6f}")
 
-        ax1.bar(np.arange(N), classical_probs, color="blue")
-        ax1.set_xlim(-0.5, N-0.5)
+        # --- 4) Plot classical vs quantum probabilities on the same scale ---
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
+
+        bar_width = 0.6
+        x_indices = np.arange(N)
+
+        ax1.bar(x_indices, classical_probs, width=bar_width, color="#1f77b4", alpha=0.8)
         ax1.set_xlabel("Vector space basis")
+        ax1.set_ylabel("Probability")
         ax1.set_title("Classical probabilities")
 
-        ax2.bar(np.arange(N), probabilities, color="gold")
-        ax2.set_xlim(-0.5, N-0.5)
+        ax2.bar(x_indices, probabilities, width=bar_width, color="#ff7f0e", alpha=0.8)
         ax2.set_xlabel("Hilbert space basis")
         ax2.set_title("Quantum probabilities")
 
+        plt.tight_layout()
         plt.show()
 
