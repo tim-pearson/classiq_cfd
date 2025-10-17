@@ -23,6 +23,7 @@ class VqlsOptimizer:
         else:
             self.es = ExecutionSession(qprog, exe_prefs)
         self.intermediate = {}
+        self.count = 0
 
     def get_cond_prop(self, res):
         aux_prob_0 = 0
@@ -35,7 +36,10 @@ class VqlsOptimizer:
         return all_prob_0 / aux_prob_0
 
     def my_cost(self, params):
+
+        self.count += 1
         results = self.es.sample(params)
+
         return 1 - self.get_cond_prop(
             results.parsed_counts_of_outputs(
                 [self.ansatz_var_name, self.aux_var_name]

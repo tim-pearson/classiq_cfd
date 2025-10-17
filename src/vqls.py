@@ -1,3 +1,4 @@
+import os
 from classiq import allocate, qfunc
 from classiq.applications.chemistry import PauliOperator
 from classiq import IBMBackendPreferences
@@ -30,10 +31,15 @@ import numpy as np
 from ansatz import apply_fixed_3_qubit_system_ansatz
 from block_encoding import block_encoding_vqls
 from optimizer import VqlsOptimizer
+from utils import plot_classical_vs_quantum, save_stats_to_json
+
+DATA_DIR = "data/"
 
 
 class Vqls:
-    def __init__(self, ansatz_param_count, pauli_terms_structs, b):
+    def __init__(self, ansatz_param_count, pauli_terms_structs, b, name):
+        self.name = name
+        self.A = hamiltonian_to_matrix(pauli_terms_structs)
         self.num_system_qubits = pauli_terms_structs.num_qubits
         self.num_ancila_qubits = (
             len(pauli_terms_structs.terms) - 1
@@ -43,6 +49,7 @@ class Vqls:
         b /= np.linalg.norm(b)
         self.b = b
         self.probs = (b**2) / np.sum(b**2)
+        self.backend = None
 
     def create_qrog(self, qmod_file=False):
 
@@ -82,15 +89,7 @@ class Vqls:
                 symbolic_only=False,
             )
 
-    def init_optimizer(self, num_shots=204800):
-        backend_preferences = ClassiqBackendPreferences(
-            backend_name="simulator_statevector"
-        )
-        # backend_preferences = IBMBackendPreferences(
-        #     backend_name="ibmq_qasm_simulator",  # or "ibm_oslo" if you want real hardware
-        #     access_token="0d2E7JXA37URkqrCW5RuUU6zJTQMsU0A-LqERjLFId52",
-        #     channel="ibm_quantum",
-        # )
+    def init_optimizer(self, num_shots=204800, backend_preferences=None):
         self.execution_preferences = ExecutionPreferences(
             num_shots=num_shots, backend_preferences=backend_preferences
         )
@@ -117,67 +116,56 @@ class Vqls:
             self.results = es.sample()
 
     def compare_results(self):
-        df = self.results.dataframe
+        N = 2**self.num_system_qubits
 
-        # Reconstruct amplitudes from quantum measurements
-        amplitudes = np.zeros(2**self.num_system_qubits).astype(complex)
-        amplitudes[df.io] = df.amplitude
+        # --- 1) Get quantum amplitudes and probabilities ---
+        df = self.results.dataframe
+        amplitudes = np.zeros(N, dtype=complex)
+        amplitudes[df.io.values.astype(int)] = df.amplitude.values
 
         # Remove global phase
         global_phase = np.angle(amplitudes[-1])
-        amplitudes = amplitudes / np.exp(1j * global_phase)
-        amplitudes = np.real(amplitudes)  # If you only want real part
-
+        amplitudes = np.real(amplitudes / np.exp(1j * global_phase))
         if amplitudes[-1] < 0:
             amplitudes *= -1
 
-        self.quantum_probs = amplitudes**2
+        probabilities = amplitudes**2
+        self.quantum_probs = probabilities
 
-        # Classical normalization for comparison
-        normalization = sum(
-            [p.coefficient for p in self.pauli_terms_structs.terms]
+        # --- 2) Classical solution ---
+        A_num = self.A
+        b = np.ones(N) / np.sqrt(N)  # uniform RHS
+        x = np.linalg.solve(A_num, b)
+        classical_probs = np.real((x / np.linalg.norm(x)))**2
+        self.classical_probs = classical_probs
+
+        # --- 3) Compute statistics ---
+        overlap = (b.dot(A_num.dot(amplitudes) / np.linalg.norm(A_num.dot(amplitudes))))**2
+        mse = np.mean((amplitudes - x / np.linalg.norm(x))**2)
+        cosine_similarity = np.dot(probabilities, classical_probs) / (
+            np.linalg.norm(probabilities) * np.linalg.norm(classical_probs)
         )
-        A_num = hamiltonian_to_matrix(self.pauli_terms_structs) / normalization
-        b = self.b
 
-        # Classical solution
-        A_inv = np.linalg.inv(A_num)
-        x_classical = np.dot(A_inv, b)
-        self.classical_probs = (
-            np.real((x_classical / np.linalg.norm(x_classical))) ** 2
-        )
+        # Store stats in a dictionary
+        stats = {
+            "iterations": self.optimizer.count,
+            "overlap": float(np.real(overlap)),
+            "mse": float(np.real(mse)),
+            "cosine_similarity": float(np.real(cosine_similarity)),
+            "classical_probs": classical_probs.tolist(),
+            "quantum_probs": probabilities.tolist()
+        }
 
-        # Compute estimated x from quantum ansatz
-        x_estimated = amplitudes / np.linalg.norm(amplitudes)
-        print("Estimated vector x from quantum ansatz:")
-        print(x_estimated)
+        # Print metrics
+        print(f"Iterations = {stats['iterations']}")
+        print(f"Overlap = {stats['overlap']:.6f}")
+        print(f"MSE = {stats['mse']:.6e}")
+        print(f"Cosine similarity = {stats['cosine_similarity']:.6f}")
 
-        # Overlap
-        overlap = (
-            b.dot(
-                A_num.dot(amplitudes) / (np.linalg.norm(A_num.dot(amplitudes)))
-            )
-        ) ** 2
-        print("Overlap:", overlap)
+        # --- 4) Save stats to JSON ---
+        save_stats_to_json(stats, self.name, folder="data")
 
-        # Plotting
-        _, (ax1, ax2) = plt.subplots(1, 2, figsize=(7, 4))
-        ax1.bar(
-            np.arange(0, 2**self.num_system_qubits),
-            self.classical_probs,
-            color="blue",
-        )
-        ax1.set_xlim(-0.5, 2**self.num_system_qubits - 0.5)
-        ax1.set_xlabel("Vector space basis")
-        ax1.set_title("Classical probabilities")
+        # --- 5) Plot ---
+        plot_classical_vs_quantum(classical_probs, probabilities, self.name)
 
-        ax2.bar(
-            np.arange(0, 2**self.num_system_qubits),
-            self.quantum_probs,
-            color="gold",
-        )
-        ax2.set_xlim(-0.5, 2**self.num_system_qubits - 0.5)
-        ax2.set_xlabel("Hilbert space basis")
-        ax2.set_title("Quantum probabilities")
-
-        plt.show()
+        return stats
