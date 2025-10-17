@@ -34,7 +34,8 @@ from optimizer import VqlsOptimizer
 
 
 class Vqls:
-    def __init__(self, ansatz_param_count, pauli_terms_structs, b):
+    def __init__(self, ansatz_param_count, pauli_terms_structs, b, A):
+        self.A =A
         self.num_system_qubits = pauli_terms_structs.num_qubits
         self.num_ancila_qubits = (
             len(pauli_terms_structs.terms) - 1
@@ -44,6 +45,7 @@ class Vqls:
         b /= np.linalg.norm(b)
         self.b = b
         self.probs = (b**2) / np.sum(b**2)
+        # self.probs =np.linalg.norm(b)
         self.backend = None
 
     def create_qrog(self, qmod_file=False):
@@ -109,86 +111,48 @@ class Vqls:
 
         with ExecutionSession(qprog_3, self.execution_preferences) as es:
             self.results = es.sample()
-
     def compare_results(self):
-        res = self.results
+        N = 2**self.num_system_qubits
 
-        # --- Try to get amplitudes if available ---
-        if hasattr(res, "dataframe") and "amplitude" in getattr(res, "dataframe", {}).columns:
-            df = res.dataframe
-            amplitudes = np.zeros(2**self.num_system_qubits, dtype=complex)
-            amplitudes[df.io] = df.amplitude
-            print("✅ Using amplitudes from statevector simulation.")
-        else:
-            # --- Fall back to probabilities from Qiskit sampler ---
-            print("⚠️  No amplitudes found — reconstructing from measurement probabilities.")
-            probs_dict = res.probabilities
-            sorted_probs = [probs_dict.get(format(i, f"0{self.num_system_qubits}b"), 0.0)
-                            for i in range(2**self.num_system_qubits)]
-            amplitudes = np.sqrt(sorted_probs)  # assume real nonnegative amplitudes
-            # note: this loses phase information, but it's all we can get from measurements
+        # --- 1) Get quantum amplitudes and probabilities ---
+        df = self.results.dataframe
+        amplitudes = np.zeros(N, dtype=complex)
+        amplitudes[df.io.values.astype(int)] = df.amplitude.values
 
-        # Normalize amplitudes
-        amplitudes = amplitudes / np.linalg.norm(amplitudes)
-
-        # Optional phase adjustment
-        if np.iscomplexobj(amplitudes):
-            global_phase = np.angle(amplitudes[-1])
-            amplitudes = amplitudes / np.exp(1j * global_phase)
-            amplitudes = np.real(amplitudes)
+        # Remove global phase
+        global_phase = np.angle(amplitudes[-1])
+        amplitudes = np.real(amplitudes / np.exp(1j * global_phase))
         if amplitudes[-1] < 0:
             amplitudes *= -1
 
-        # Store quantum probabilities
-        self.quantum_probs = np.real(amplitudes)**2
+        probabilities = amplitudes**2
+        self.quantum_probs = probabilities
 
-        # Classical normalization
+        # --- 2) Classical solution ---
         normalization = sum(p.coefficient for p in self.pauli_terms_structs.terms)
-        A_num = hamiltonian_to_matrix(self.pauli_terms_structs) / normalization
-        b = self.b
-
-
-        # Classical solution
+        A_num = self.A
+        b = np.ones(N) / np.sqrt(N)  # uniform RHS
         A_inv = np.linalg.inv(A_num)
-        x_classical = np.dot(A_inv, b)
-        self.classical_probs = (np.real(x_classical / np.linalg.norm(x_classical)))**2
+        x = A_inv @ b
+        classical_probs = np.real((x / np.linalg.norm(x)))**2
+        self.classical_probs = classical_probs
 
-        # Summary
-        # Estimated x from quantum ansatz (already computed)
-        x_estimated = amplitudes / np.linalg.norm(amplitudes)
+        # --- 3) Compute overlap ---
+        overlap = (b.dot(A_num.dot(amplitudes) / np.linalg.norm(A_num.dot(amplitudes))))**2
+        print("overlap =", overlap)
 
-        # Classical solution (already computed)
-        x_classical = np.real(x_classical / np.linalg.norm(x_classical))
+        # --- 4) Plot classical vs quantum probabilities ---
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7, 4))
 
-        # 🧾 Display both vectors
-        print("\n=== Comparison of Vectors ===")
-        print(f"b vector:        {np.round(b, 4)}")
-        print(f"Cost count: {self.optimizer.count}")
-        print(f"x_classical:     {np.round(x_classical, 4)}")
-        print(f"x_estimated(q):  {np.round(x_estimated, 4)}")
-
-        # 🧮 Cosine similarity or overlap
-        cosine_sim = np.dot(x_estimated, x_classical) / (
-            np.linalg.norm(x_estimated) * np.linalg.norm(x_classical)
-        )
-        print(f"\nCosine similarity between classical and quantum x: {cosine_sim:.6f}")
-
-        # Overlap
-        overlap = (b.dot(A_num.dot(amplitudes)) / np.linalg.norm(A_num.dot(amplitudes)))**2
-        print(f"Overlap: {overlap:.6f}\n")
-        alpha = np.dot(x_classical, x_estimated) / np.dot(x_estimated, x_estimated)
-
-
-        # Plot
-        _, (ax1, ax2) = plt.subplots(1, 2, figsize=(7, 4))
-        ax1.bar(np.arange(0, 2**self.num_system_qubits), self.classical_probs, color="blue")
-        ax1.set_xlim(-0.5, 2**self.num_system_qubits - 0.5)
+        ax1.bar(np.arange(N), classical_probs, color="blue")
+        ax1.set_xlim(-0.5, N-0.5)
         ax1.set_xlabel("Vector space basis")
         ax1.set_title("Classical probabilities")
 
-        ax2.bar(np.arange(0, 2**self.num_system_qubits), self.quantum_probs, color="gold")
-        ax2.set_xlim(-0.5, 2**self.num_system_qubits - 0.5)
+        ax2.bar(np.arange(N), probabilities, color="gold")
+        ax2.set_xlim(-0.5, N-0.5)
         ax2.set_xlabel("Hilbert space basis")
         ax2.set_title("Quantum probabilities")
 
         plt.show()
+

@@ -34,22 +34,32 @@ backend_preferences = ClassiqBackendPreferences(
 # )
 
 
-pauli_terms_structs = (
+pauli_terms_structs_old = (
     0.55 * Pauli.I(0)
     + 0.225 * Pauli.I(0) * Pauli.Z(1) * Pauli.I(2)
     + 0.225 * Pauli.I(0) * Pauli.I(1) * Pauli.Z(2)
 )
 
+pauli_terms_structs_new = (
+    0.6 * Pauli.I(0)
+    + 0.2 * Pauli.Z(0) * Pauli.I(1) * Pauli.I(2)
+    + 0.2 * Pauli.I(0) * Pauli.Z(1) * Pauli.Z(2)
+)
+
+# %%
 ansatz_param_count = 9
 
-A = hamiltonian_to_matrix(pauli_terms_structs)
-
-pauli_terms_structs = matrix_to_pauli_operator(A)
+A_new = hamiltonian_to_matrix(pauli_terms_structs_new)
+print(A_new)
+A_old = hamiltonian_to_matrix(pauli_terms_structs_old)
+print(A_old)
 
 # %%
 
-b = np.array([0.2, 0.1, 0.3, 0.15, 0.05, 0.1, 0.05, 0.05])
-vqls = Vqls(ansatz_param_count, pauli_terms_structs, b)
+# b = np.array([0.2, 0.1, 0.3, 0.15, 0.05, 0.1, 0.05, 0.05])  
+# b /= np.linalg.norm(b)
+b = np.ones(8) / np.sqrt(8)
+vqls = Vqls(ansatz_param_count, pauli_terms_structs_old, b, A_old)
 print("creating qprog")
 vqls.create_qrog()
 print("init optimizer")
@@ -61,7 +71,4 @@ vqls.evaluate_ansatz(optimal_params)
 print("comparing results")
 vqls.compare_results()
 # %%
-from pprint import pprint
 
-pprint(vqls.results.__dict__)
-print()
