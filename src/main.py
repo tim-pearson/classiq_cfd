@@ -2,15 +2,9 @@ import os
 
 import matplotlib.pyplot as plt
 from classiq import ClassiqBackendPreferences, IBMBackendPreferences, Pauli
-from classiq.applications.hamiltonian.pauli_decomposition import (
-    hamiltonian_to_matrix,
-    matrix_to_pauli_operator,
-)
 import numpy as np
 from classiq import ClassiqBackendPreferences, ClassiqNvidiaBackendNames
 from pandas.io.formats.style import plt
-
-# from backend_preferences import get_ibm_backends
 from optimizer import VqlsOptimizer
 from vqls import Vqls
 from dotenv import load_dotenv

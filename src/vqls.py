@@ -5,17 +5,12 @@ from classiq import IBMBackendPreferences
 
 import matplotlib.pyplot as plt
 from classiq import (
-    H,
     CArray,
     CReal,
-    ClassiqBackendPreferences,
-    ExecutionPreferences,
     ExecutionSession,
     Output,
-    Pauli,
     QNum,
     allocate,
-    apply_to_all,
     lcu_pauli,
     qfunc,
     write_qmod,
@@ -23,7 +18,6 @@ from classiq import (
 )
 from classiq.applications.hamiltonian.pauli_decomposition import (
     hamiltonian_to_matrix,
-    matrix_to_pauli_operator,
 )
 from classiq.synthesis import synthesize
 import numpy as np
