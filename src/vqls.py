@@ -1,5 +1,5 @@
 import os
-from classiq import allocate, qfunc
+from classiq import ExecutionPreferences, allocate, qfunc
 from classiq.applications.chemistry import PauliOperator
 from classiq import IBMBackendPreferences
 
@@ -35,9 +35,13 @@ class Vqls:
         self.name = name
         self.A = hamiltonian_to_matrix(pauli_terms_structs)
         self.num_system_qubits = pauli_terms_structs.num_qubits
+        # self.num_system_qubits = len(pauli_terms_structs[0].pauli)
+        print(self.num_system_qubits)
         self.num_ancila_qubits = (
             len(pauli_terms_structs.terms) - 1
         ).bit_length()
+        
+        print(self.num_ancila_qubits)
         self.ansatz_param_count = ansatz_param_count
         self.pauli_terms_structs = pauli_terms_structs
         b /= np.linalg.norm(b)
