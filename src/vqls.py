@@ -141,11 +141,12 @@ class Vqls:
 
         # --- 2) Classical solution ---
         A_num = self.A
-        b = np.ones(N) / np.sqrt(N)  # uniform RHS
-        x = np.linalg.solve(A_num, b)
+        # b = np.ones(N) / np.sqrt(N)  # uniform RHS
+        x = np.linalg.solve(A_num, self.b)
         classical_probs = np.real((x / np.linalg.norm(x))) ** 2
         self.classical_probs = classical_probs
 
+        b = self.b
         # --- 3) Compute statistics ---
         overlap = (
             b.dot(
@@ -172,6 +173,8 @@ class Vqls:
         print(f"Overlap = {stats['overlap']:.6f}")
         print(f"MSE = {stats['mse']:.6e}")
         print(f"Cosine similarity = {stats['cosine_similarity']:.6f}")
+        print(f"Classical probs = {classical_probs}")
+        print(f"Estimated probs = {probabilities.tolist()}")
 
         # --- 4) Save stats to JSON ---
         save_stats_to_json(stats, self.name, folder="data")
