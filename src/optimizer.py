@@ -32,7 +32,7 @@ class VqlsOptimizer:
             if s.state[self.aux_var_name] == 0:
                 aux_prob_0 += s.shots
                 if s.state[self.ansatz_var_name] == 0:
-                    all_prob_0 = s.shots
+                    all_prob_0 += s.shots
         return all_prob_0 / aux_prob_0
 
     def my_cost(self, params):

@@ -22,7 +22,7 @@ from classiq.applications.hamiltonian.pauli_decomposition import (
 from classiq.synthesis import synthesize
 import numpy as np
 
-from ansatz import apply_fixed_3_qubit_system_ansatz
+from ansatz import apply_fixed_2_qubit_system_ansatz, apply_fixed_3_qubit_system_ansatz
 from block_encoding import block_encoding_vqls
 from optimizer import VqlsOptimizer
 from utils import plot_classical_vs_quantum, save_stats_to_json
@@ -40,7 +40,7 @@ class Vqls:
         self.num_ancila_qubits = (
             len(pauli_terms_structs.terms) - 1
         ).bit_length()
-        
+
         print(self.num_ancila_qubits)
         self.ansatz_param_count = ansatz_param_count
         self.pauli_terms_structs = pauli_terms_structs
@@ -61,10 +61,16 @@ class Vqls:
             allocate(ancillary_qubits)
             allocate(system_qubits)
 
+            print("num_system_qubits:", self.num_system_qubits)
+            print("length of self.b:", len(self.b))
+            print("sum of probabilities:", np.sum(self.probs))
             block_encoding_vqls(
-                ansatz=lambda: apply_fixed_3_qubit_system_ansatz(
+                ansatz=lambda: apply_fixed_2_qubit_system_ansatz(
                     params, system_qubits
                 ),
+                # ansatz=lambda: apply_fixed_3_qubit_system_ansatz(
+                #     params, system_qubits
+                # ),
                 block_encoding=lambda: lcu_pauli(
                     operator=self.pauli_terms_structs,
                     data=system_qubits,
@@ -104,7 +110,10 @@ class Vqls:
         @qfunc
         def main(io: Output[QNum[self.num_system_qubits]]):
             allocate(io)
-            apply_fixed_3_qubit_system_ansatz(
+            # apply_fixed_3_qubit_system_ansatz(
+            #     list(optimal_params.values()), io
+            # )
+            apply_fixed_2_qubit_system_ansatz(
                 list(optimal_params.values()), io
             )
 
@@ -134,12 +143,16 @@ class Vqls:
         A_num = self.A
         b = np.ones(N) / np.sqrt(N)  # uniform RHS
         x = np.linalg.solve(A_num, b)
-        classical_probs = np.real((x / np.linalg.norm(x)))**2
+        classical_probs = np.real((x / np.linalg.norm(x))) ** 2
         self.classical_probs = classical_probs
 
         # --- 3) Compute statistics ---
-        overlap = (b.dot(A_num.dot(amplitudes) / np.linalg.norm(A_num.dot(amplitudes))))**2
-        mse = np.mean((amplitudes - x / np.linalg.norm(x))**2)
+        overlap = (
+            b.dot(
+                A_num.dot(amplitudes) / np.linalg.norm(A_num.dot(amplitudes))
+            )
+        ) ** 2
+        mse = np.mean((amplitudes - x / np.linalg.norm(x)) ** 2)
         cosine_similarity = np.dot(probabilities, classical_probs) / (
             np.linalg.norm(probabilities) * np.linalg.norm(classical_probs)
         )
@@ -151,7 +164,7 @@ class Vqls:
             "mse": float(np.real(mse)),
             "cosine_similarity": float(np.real(cosine_similarity)),
             "classical_probs": classical_probs.tolist(),
-            "quantum_probs": probabilities.tolist()
+            "quantum_probs": probabilities.tolist(),
         }
 
         # Print metrics

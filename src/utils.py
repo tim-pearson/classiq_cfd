@@ -66,7 +66,7 @@ def plot_classical_vs_quantum(
 
 
 
-def visualize_vqls_results(folder="data"):
+def show_save_results(folder="data"):
     """
     Reads all JSON result files from a folder and plots each result.
     """

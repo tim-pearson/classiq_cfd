@@ -29,6 +29,8 @@ tk = os.environ["IBMQ_API_KEY"]
 #     instance_crn=crn,
 # )
 
+
+
 backend_preferences = ClassiqBackendPreferences(
     backend_name="simulator_statevector"
 )
@@ -65,15 +67,25 @@ pauli_terms_structs_4 = (
     * Pauli.I(2)  # off-diagonal +1/-1 (flips qubit 1)
 )
 pauli_pressure = (
-    2.0 * Pauli.I(0) * Pauli.I(1)                 # main diagonal
-    - 1.0 * Pauli.X(0) * Pauli.I(1)               # flips qubit 0 → connects |00>↔|10>, |01>↔|11>
-    - 1.0 * Pauli.I(0) * Pauli.X(1)               # flips qubit 1 → connects |00>↔|01>, |10>↔|11>
+    0.5 * Pauli.I(0) * Pauli.I(1)                 # main diagonal
+    - 0.25 * Pauli.X(0) * Pauli.I(1)               # flips qubit 0 → connects |00>↔|10>, |01>↔|11>
+    - 0.5 * Pauli.I(0) * Pauli.X(1)               # flips qubit 1 → connects |00>↔|01>, |10>↔|11>
 )
+# %%
+m = hamiltonian_to_matrix(pauli_terms_structs_4) / 4.0
+mtm = m.T @ m
+lambda_max = np.max(np.linalg.eigvals(mtm))
+alpha = 1 / np.sqrt(lambda_max)
+U = alpha * m
+
+# step 5: verify
+print(np.allclose(U.T @ U, np.eye(m.shape[0])))  # should be True
+print(U.T @ U)
 # %%
 # %%
 # b = np.array([0.2, 0.1, 0.3, 0.15, 0.05, 0.1, 0.05, 0.05])
 # b /= np.linalg.norm(b)
-b = np.ones(8) / np.sqrt(8)
+b = np.ones(4) / np.sqrt(4)
 # %%
 b_physical = np.array([
     0.2,  0.1,  0.0,
@@ -86,12 +98,12 @@ b_physical /= np.linalg.norm(b_physical)  # normalize for quantum state
 A = hamiltonian_to_matrix(pauli_pressure)
 # %%
 ansatz_param_count = 9
-vqls = Vqls(ansatz_param_count, pauli_pressure, b_physical, "tridiagonal A")
+vqls = Vqls(ansatz_param_count, pauli_pressure, b, "tridiagonal A")
 # %%
 print("creating qprog")
 vqls.create_qrog()
 print("init optimizer")
-vqls.init_optimizer(204800, backend_preferences=backend_preferences)
+vqls.init_optimizer(2048, backend_preferences=backend_preferences)
 print("optimizing")
 optimal_params = vqls.optimizer.optimize()
 print("evalutating ansatz")
@@ -100,6 +112,6 @@ print("comparing results")
 vqls.compare_results()
 # %%
 
-from utils import laplacian_2d, visualize_vqls_results
+from utils import laplacian_2d, show_save_results
 
-visualize_vqls_results("data")
+show_save_results("data")
