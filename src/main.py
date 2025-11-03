@@ -37,7 +37,6 @@ tk = os.environ["IBMQ_API_KEY"]
 
 backend_preferences = ClassiqBackendPreferences(backend_name="simulator_statevector")
 
-
 pauli_terms_structs_1 = (
     0.55 * Pauli.I(0)
     + 0.225 * Pauli.I(0) * Pauli.Z(1) * Pauli.I(2)
@@ -74,15 +73,16 @@ m = hamiltonian_to_matrix(pauli_pressure)
 # b /= np.linalg.norm(b)
 b = np.ones(4) / np.sqrt(4)
 # %%
-b_physical = np.array([0.25, 0.1, 0.1, 0.45])
+b_physical = np.array([0.25, 0.001, 0.001, 0.45])
 b_physical /= np.linalg.norm(b_physical)  # normalize for quantum state
 
 # %%
 A = hamiltonian_to_matrix(pauli_pressure)
+np.real(A)
 print(np.linalg.inv(A)@ b)
 # %%
 ansatz_param_count = 9
-vqls = Vqls(ansatz_param_count, pauli_pressure, b_physical, "2x2 pressure rand b")
+vqls = Vqls(ansatz_param_count, pauli_pressure, b_physical, "2x2 pressure b with 0.001's")
 # %%
 print("creating qprog")
 vqls.create_qrog()

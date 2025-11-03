@@ -97,6 +97,7 @@ class Vqls:
         self.execution_preferences = ExecutionPreferences(
             num_shots=num_shots, backend_preferences=backend_preferences
         )
+        self.num_shots = num_shots
 
         self.optimizer = VqlsOptimizer(
             self.qprog_2,
@@ -161,6 +162,7 @@ class Vqls:
         # Store stats in a dictionary
         stats = {
             "iterations": self.optimizer.count,
+            "Shots per iteration": self.num_shots,
             "overlap": float(np.real(overlap)),
             "mse": float(np.real(mse)),
             "cosine_similarity": float(np.real(cosine_similarity)),
@@ -175,6 +177,7 @@ class Vqls:
         print(f"Cosine similarity = {stats['cosine_similarity']:.6f}")
         print(f"Classical probs = {classical_probs}")
         print(f"Estimated probs = {probabilities.tolist()}")
+        print(f"Shots per iteration: {self.num_shots}")
 
         # --- 4) Save stats to JSON ---
         save_stats_to_json(stats, self.name, folder="data")
