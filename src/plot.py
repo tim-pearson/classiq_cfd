@@ -1,3 +1,3 @@
-from utils import visualize_vqls_results
-visualize_vqls_results("data")
+from utils import show_save_results
+show_save_results("data")
 

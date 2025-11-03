@@ -16,6 +16,7 @@ I think this could reduce **error** and **measurement overhead**.
 ---
 
 ## Systems Tested
+
 > The backend used was the **Classiq simulator (`simulator_statevector`)**.
 
 $$
@@ -37,10 +38,6 @@ $$
 $$
 A_3 = 0.6I_0 + 0.2(Z_0 I_1 I_2) + 0.2(I_0 Y_1 Z_2)
 $$
-
-Each represents a different structured linear operator, gradually introducing
-non-commuting terms to mimic off-diagonal interactions (as seen in CFD
-discretizations).
 
 ---
 

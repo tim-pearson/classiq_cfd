@@ -1,13 +1,23 @@
 import os
 
+from classiq.applications.hamiltonian.pauli_decomposition import (
+    hamiltonian_to_matrix,
+    matrix_to_hamiltonian,
+)
 import matplotlib.pyplot as plt
-from classiq import ClassiqBackendPreferences, IBMBackendPreferences, Pauli
+from classiq import (
+    ClassiqBackendPreferences,
+    IBMBackendPreferences,
+    Pauli,
+    SparsePauliOp,
+)
 import numpy as np
 from classiq import ClassiqBackendPreferences, ClassiqNvidiaBackendNames
 from pandas.io.formats.style import plt
 from optimizer import VqlsOptimizer
 from vqls import Vqls
 from dotenv import load_dotenv
+from utils import laplacian_2d
 
 # %%
 
@@ -24,10 +34,8 @@ tk = os.environ["IBMQ_API_KEY"]
 #     instance_crn=crn,
 # )
 
-backend_preferences = ClassiqBackendPreferences(
-    backend_name="simulator_statevector"
-)
 
+backend_preferences = ClassiqBackendPreferences(backend_name="simulator_statevector")
 
 pauli_terms_structs_1 = (
     0.55 * Pauli.I(0)
@@ -48,20 +56,38 @@ pauli_terms_structs_3 = (
 )
 
 
+pauli_terms_structs_4 = (
+    0.5 * Pauli.I(0) * Pauli.I(1) * Pauli.I(2)  # main diagonal
+    + 0.25 * Pauli.X(0) * Pauli.I(1) * Pauli.I(2)  # off-diagonal +1/-1 (flips qubit 0)
+    + 0.25 * Pauli.I(0) * Pauli.X(1) * Pauli.I(2)  # off-diagonal +1/-1 (flips qubit 1)
+)
+pauli_pressure = (
+    0.5 * Pauli.I(0) * Pauli.I(1)  # main diagonal
+    - 0.25 * Pauli.X(0) * Pauli.I(1)  # flips qubit 0 → connects |00>↔|10>, |01>↔|11>
+    - 0.5 * Pauli.I(0) * Pauli.X(1)  # flips qubit 1 → connects |00>↔|01>, |10>↔|11>
+)
+# %%
+m = hamiltonian_to_matrix(pauli_pressure)
+# %%
+# b = np.array([0.2, 0.1, 0.3, 0.15, 0.05, 0.1, 0.05, 0.05])
+# b /= np.linalg.norm(b)
+b = np.ones(4) / np.sqrt(4)
+# %%
+b_physical = np.array([0.25, 0.001, 0.001, 0.45])
+b_physical /= np.linalg.norm(b_physical)  # normalize for quantum state
+
+# %%
+A = hamiltonian_to_matrix(pauli_pressure)
+np.real(A)
+print(np.linalg.inv(A)@ b)
 # %%
 ansatz_param_count = 9
-# b = np.array([0.2, 0.1, 0.3, 0.15, 0.05, 0.1, 0.05, 0.05])  
-# b /= np.linalg.norm(b)
-b = np.ones(8) / np.sqrt(8)
-# %%
-vqls = Vqls(ansatz_param_count, pauli_terms_structs_3, b, "ps3_test")
-# vqls = Vqls(ansatz_param_count, pauli_terms_structs_2, b, "ps2_test")
-# vqls = Vqls(ansatz_param_count, pauli_terms_structs_1, b, "ps1_test")
+vqls = Vqls(ansatz_param_count, pauli_pressure, b_physical, "2x2 pressure b with 0.001's")
 # %%
 print("creating qprog")
 vqls.create_qrog()
 print("init optimizer")
-vqls.init_optimizer(204800, backend_preferences=backend_preferences)
+vqls.init_optimizer(2048, backend_preferences=backend_preferences)
 print("optimizing")
 optimal_params = vqls.optimizer.optimize()
 print("evalutating ansatz")
@@ -69,6 +95,3 @@ vqls.evaluate_ansatz(optimal_params)
 print("comparing results")
 vqls.compare_results()
 # %%
-
-from utils import visualize_vqls_results
-visualize_vqls_results("data")

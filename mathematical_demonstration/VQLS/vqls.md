@@ -2,7 +2,7 @@
 
 ### Timothy Pearson
 
-## Goal
+
 
 We aim to solve a system of linear equations in the form:
 $$Ax=b$$
@@ -71,7 +71,7 @@ We aim to prepare $\ket{x}$ such that:
 $$\ket{\Psi} = \frac{A \ket{x}}{\sqrt{\bra{x}A^\dagger A \ket{x}}} \propto
 \ket{b} $$
 where we can create/preprare:
-since, for any quantum state $\ket{b} \quad  \exists \text{ unitary } U_b$ such
+since, for any quantum state $\ket{b}, \quad  \exists \text{ unitary } U_b$ such
 that: 
 
 $$\ket{b} = U_b \ket{0} 
@@ -117,8 +117,12 @@ $$
 }
 \]
 
+![Diagram](/home/tim/.cache/nvim/circuits/diagram.png)
 
-$$\ket{\psi_0} =  \ket{0}_{anc} \otimes \ket{0}_{sys}$$
+
+$$
+\ket{\psi_0} =  \ket{0}_{anc} \otimes \ket{0}_{sys}
+$$
 
 After applying $V(w)$ to $\ket{0}_{sys}$ to obtain $\ket{x}$
 
@@ -313,7 +317,3 @@ the normalized solution of the linear system.
 6. Compute cost function:  
    - $C = 1 - |⟨b|Ψ⟩|^2$  
    - Update parameters $w$.  
-
-
-
----

@@ -66,7 +66,7 @@ def plot_classical_vs_quantum(
 
 
 
-def visualize_vqls_results(folder="data"):
+def show_save_results(folder="data"):
     """
     Reads all JSON result files from a folder and plots each result.
     """
@@ -100,4 +100,39 @@ def visualize_vqls_results(folder="data"):
         # Plot and save
         name = os.path.splitext(filename)[0]
         plot_classical_vs_quantum(classical_probs, quantum_probs, name=name)
+
+def laplacian_2d(Nx, Ny):
+    N = Nx * Ny
+    A = np.zeros((N, N))
+    
+    # Main diagonal = number of neighbors per cell
+    main_diag = np.full(N, 4)
+    
+    # Adjust for edges/corners
+    for i in range(Nx):
+        for j in range(Ny):
+            idx = i*Ny + j
+            count = 0
+            if i > 0: count += 1
+            if i < Nx-1: count += 1
+            if j > 0: count += 1
+            if j < Ny-1: count += 1
+            main_diag[idx] = count
+    A[np.arange(N), np.arange(N)] = main_diag
+
+    # Off-diagonals
+    # Horizontal neighbors
+    for i in range(Nx):
+        for j in range(Ny-1):
+            idx = i*Ny + j
+            A[idx, idx+1] = -1
+            A[idx+1, idx] = -1
+    # Vertical neighbors
+    for i in range(Nx-1):
+        for j in range(Ny):
+            idx = i*Ny + j
+            A[idx, idx+Ny] = -1
+            A[idx+Ny, idx] = -1
+
+    return A
 
