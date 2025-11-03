@@ -2,7 +2,7 @@
 
 ### Timothy Pearson
 
-## Goal
+
 
 We aim to solve a system of linear equations in the form:
 $$Ax=b$$
@@ -116,6 +116,7 @@ $$
 \ghost{U_b} & \meter
 }
 \]
+
 ![Diagram](/home/tim/.cache/nvim/circuits/diagram.png)
 
 
