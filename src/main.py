@@ -25,109 +25,96 @@ from utils import create_poisson_matrix_pauli, generate_guaranteed_b, laplacian_
 load_dotenv()
 tk = os.environ["IBMQ_API_KEY"]
 
-
-# be_name =get_ibm_backends(tk)[0].name
-# print(be_name)
-# backend_preferences = IBMBackendPreferences(
-#     backend_name=be_name,
-#     access_token=tk,
-#     channel="ibm_quantum_platform",
-#     instance_crn=crn,
-# )
-
-
 backend_preferences = ClassiqBackendPreferences(
     backend_name="simulator_statevector"
 )
 
-
-pauli_pressure = (
-    0.5 * Pauli.I(0) * Pauli.I(1)
-    - 0.25 * Pauli.I(0) * Pauli.X(1)
-    - 0.25 * Pauli.X(0) * Pauli.I(1)
-)
 # %%
-pauli_terms_structs = (
-    0.55 * Pauli.I(0)
-    + 0.225 * Pauli.I(0) * Pauli.Z(1) * Pauli.I(2)
-    + 0.225 * Pauli.I(0) * Pauli.I(1) * Pauli.Z(2)
-)
-
-
-# %%
-# p = pauli_pressure
-# A_num = pauli_operator_to_matrix(p)
 p, A_num = create_poisson_matrix_pauli(2)
+print("Poisson matrix:")
 print(A_num)
+
 b = generate_guaranteed_b(A_num, seed=2)
-print(b)
+print(f"b vector: {b}")
+
+# Classical solution
 A_inv = np.linalg.inv(A_num)
-x = np.dot(A_inv, b.T)
-print("x = " , x )
-classical_probs = np.real((x / np.linalg.norm(x))) ** 2
-# %%
+x_classical = np.dot(A_inv, b.T)
+x_classical = x_classical.real
+print(f"Classical solution: {x_classical}")
+
+# Verify classical solution
+Ax_classical = A_num.dot(x_classical)
+print(f"A @ x_classical: {Ax_classical}")
+print(f"Should equal b:  {b}")
+print(f"Verification error: {np.linalg.norm(Ax_classical - b):.2e}")
+
+# Normalized versions for comparison
+x_classical_normalized = x_classical / np.linalg.norm(x_classical)
+
+# VQLS setup
 ansatz_param_count = 12
 num_system_qubits = p.num_qubits
-vqls = Vqls(ansatz_param_count, p, b, "blank")
-# %%
-print("creating qprog")
-vqls.create_qrog()
-print("init optimizer")
-vqls.init_optimizer(204800, backend_preferences=backend_preferences)
-print("optimizing")
-optimal_params = vqls.optimizer.optimize()
-print("evalutating ansatz")
-vqls.evaluate_ansatz(optimal_params)
-# %%
 
+# %%
+vqls = Vqls(ansatz_param_count, p, b, "blank")
+
+print("Creating quantum program...")
+vqls.create_qrog()
+
+print("Initializing optimizer...")
+vqls.init_optimizer(204800, backend_preferences=backend_preferences)
+
+print("Optimizing...")
+optimal_params = vqls.optimizer.optimize()
+# %%
+print("Evaluating ansatz...")
+vqls.evaluate_ansatz(optimal_params)
+
+# Process results
 df = vqls.results.dataframe
 amplitudes = np.zeros(2**num_system_qubits).astype(complex)
 amplitudes[df.io] = df.amplitude
+
+# Phase correction
 global_phase = np.angle(amplitudes[-1])
 amplitudes = np.real(amplitudes / np.exp(1j * global_phase))
 if amplitudes[-1] < 0:
     amplitudes *= -1
-print(amplitudes)
-probabilities = amplitudes**2
 
-print(
-    "overlap =",
-    (b.dot(A_num.dot(amplitudes) / (np.linalg.norm(A_num.dot(amplitudes)))))
-    ** 2,
-)
-# %%
+print(f"VQLS amplitudes: {amplitudes}")
 
-print("\n--- Comparison: VQLS vs Classical ---")
+# Normalize VQLS solution for comparison
+x_vqls_normalized = amplitudes / np.linalg.norm(amplitudes)
 
-# Classical solution (exact)
-x_classical = np.dot(A_inv, b.T)
-x_classical = x_classical.real  # Take real part
-x_classical /= np.linalg.norm(x_classical)  # Normalize
-print(x_classical)
-est = A_num.dot(amplitudes)
-est = est / np.linalg.norm(est)
-est
-sol = A_num.dot(x_classical)
-sol = sol / np.linalg.norm(sol)
-np.real(sol)
-print(np.real(b / np.linalg.norm(b)))
+print("\n" + "="*50)
+print("COMPARISON: VQLS vs Classical")
+print("="*50)
 
-# VQLS solution (estimated)
-x_vqls = amplitudes  # From your VQLS results
+print("Classical x (normalized):")
+print(np.array2string(x_classical_normalized, precision=4, suppress_small=True))
 
-# Print both solutions
-print("Classical x (exact):")
-print(np.array2string(x_classical, precision=4, suppress_small=True))
-print("\nVQLS x (estimated):")
-print(np.array2string(x_vqls, precision=4, suppress_small=True))
+print("\nVQLS x (normalized):")
+print(np.array2string(x_vqls_normalized, precision=4, suppress_small=True))
 
-# Calculate and print the error
-error = np.linalg.norm(x_classical - x_vqls)
+# Calculate metrics using NORMALIZED vectors
+error = np.linalg.norm(x_classical_normalized - x_vqls_normalized)
+overlap = np.abs(x_classical_normalized.dot(x_vqls_normalized)) ** 2
+
 print(f"\nL2 Error: {error:.4f}")
-
-# Calculate the overlap (fidelity)
-overlap = np.abs(x_classical.dot(x_vqls)) ** 2
 print(f"Overlap (fidelity): {overlap:.4f}")
-# %%
 
+# Check what VQLS actually achieved
+A_x_vqls = A_num.dot(amplitudes)
+A_x_vqls_norm = A_x_vqls / np.linalg.norm(A_x_vqls)
+actual_cost = np.linalg.norm(A_x_vqls_norm - b)**2
 
+print(f"\nVQLS achieved cost: {actual_cost:.6f}")
+print(f"b · (A|x_vqls⟩/||A|x_vqls⟩||): {np.abs(b.dot(A_x_vqls_norm)):.6f}")
+
+print("\n" + "="*50)
+print("VERIFICATION")
+print("="*50)
+print(f"A @ x_classical: {A_num.dot(x_classical)}")
+print(f"b:               {b}")
+print(f"Match: {np.allclose(A_num.dot(x_classical), b, atol=1e-10)}")
