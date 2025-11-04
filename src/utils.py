@@ -151,3 +151,56 @@ def genrate_random_b(pauli_terms, seed=42, size=None):
     x = np.linalg.solve(A, b)
 
     return b, x, A
+
+
+
+def make_real_if_close(vec, tol=1e-8):
+    """If imaginary parts are small compared to tol, return real part; otherwise return original."""
+    if np.max(np.abs(np.imag(vec))) < tol:
+        return np.real(vec)
+    return vec
+
+def normalize(vec):
+    norm = np.linalg.norm(vec)
+    if norm == 0:
+        return vec
+    return vec / norm
+
+def fidelity(u, v):
+    """Fidelity between two normalized states (complex)."""
+    u = normalize(u)
+    v = normalize(v)
+    return np.abs(np.vdot(u, v))**2
+
+# %% Corrected get_solution (replace your existing method)
+def get_solution_from_results(results, num_system_qubits):
+    """
+    results: object with .dataframe having columns 'io' (int index) and 'amplitude' (complex)
+    num_system_qubits: int
+    returns: amplitude vector (complex) normalized
+    """
+    N = 2 ** num_system_qubits
+    df = results.dataframe
+
+    amplitudes = np.zeros(N, dtype=complex)
+    # ensure ordering: df.io must map 0..N-1 (computational basis)
+    amplitudes[df.io.values.astype(int)] = df.amplitude.values
+
+    # remove a uniform global phase (align last nonzero element)
+    # find an index with largest magnitude to avoid dividing by tiny value
+    idx = np.argmax(np.abs(amplitudes))
+    if np.abs(amplitudes[idx]) > 1e-12:
+        global_phase = np.angle(amplitudes[idx])
+        amplitudes = amplitudes * np.exp(-1j * global_phase)
+
+    # If target is expected real-valued, allow small imag noise removal:
+    amplitudes = make_real_if_close(amplitudes, tol=1e-7)
+
+    # normalize and preserve sign/phase (no squaring!)
+    amplitudes = normalize(amplitudes)
+
+    # If you want to enforce a real convention (optional):
+    # if np.max(np.abs(np.imag(amplitudes))) < 1e-7:
+    #     amplitudes = np.real(amplitudes)
+
+    return amplitudes

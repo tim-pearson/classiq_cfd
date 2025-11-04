@@ -3,6 +3,7 @@ import os
 from classiq.applications.hamiltonian.pauli_decomposition import (
     hamiltonian_to_matrix,
     matrix_to_hamiltonian,
+    pauli_operator_to_matrix,
 )
 import matplotlib.pyplot as plt
 from classiq import (
@@ -37,53 +38,28 @@ tk = os.environ["IBMQ_API_KEY"]
 
 backend_preferences = ClassiqBackendPreferences(backend_name="simulator_statevector")
 
-pauli_terms_structs_1 = (
-    0.55 * Pauli.I(0)
-    + 0.225 * Pauli.I(0) * Pauli.Z(1) * Pauli.I(2)
-    + 0.225 * Pauli.I(0) * Pauli.I(1) * Pauli.Z(2)
-)
-
-pauli_terms_structs_2 = (
-    0.6 * Pauli.I(0)
-    + 0.2 * Pauli.Z(0) * Pauli.I(1) * Pauli.I(2)
-    + 0.2 * Pauli.I(0) * Pauli.Z(1) * Pauli.Z(2)
-)
-
-pauli_terms_structs_3 = (
-    0.6 * Pauli.I(0)
-    + 0.2 * Pauli.Z(0) * Pauli.I(1) * Pauli.I(2)
-    + 0.2 * Pauli.I(0) * Pauli.Y(1) * Pauli.Z(2)
-)
 
 
-pauli_terms_structs_4 = (
-    0.5 * Pauli.I(0) * Pauli.I(1) * Pauli.I(2)  # main diagonal
-    + 0.25 * Pauli.X(0) * Pauli.I(1) * Pauli.I(2)  # off-diagonal +1/-1 (flips qubit 0)
-    + 0.25 * Pauli.I(0) * Pauli.X(1) * Pauli.I(2)  # off-diagonal +1/-1 (flips qubit 1)
-)
 pauli_pressure = (
-    0.5 * Pauli.I(0) * Pauli.I(1)  # main diagonal
-    - 0.25 * Pauli.X(0) * Pauli.I(1)  # flips qubit 0 → connects |00>↔|10>, |01>↔|11>
-    - 0.5 * Pauli.I(0) * Pauli.X(1)  # flips qubit 1 → connects |00>↔|01>, |10>↔|11>
-)
-
-pauli_pressure_2x2_norm = (
     0.5 * Pauli.I(0) * Pauli.I(1)  
     - 0.25 * Pauli.I(0) * Pauli.X(1)  
     - 0.25 * Pauli.X(0) * Pauli.I(1)  
 )
 # %%
+pauli_terms_structs = (
+    0.55 * Pauli.I(0)
+    + 0.225 * Pauli.I(0) * Pauli.Z(1) * Pauli.I(2)
+    + 0.225 * Pauli.I(0) * Pauli.I(1) * Pauli.Z(2)
+)
+normalization = sum([p.coefficient for p in pauli_terms_structs.terms])
 
+num_system_qubits = pauli_terms_structs.num_qubits
 
 # %%
-ansatz_param_count = 6
-b, x, A = genrate_random_b(pauli_pressure_2x2_norm)
-x = np.real(x)
-x = x /  np.linalg.norm(x)
-print("b = " , np.real(b))
-print("x = " , x )
-vqls = Vqls(ansatz_param_count, pauli_pressure_2x2_norm, b, "2x2 pressure b even super pos 2x2")
-# %%
+b = np.ones(8) / np.sqrt(8)
+ansatz_param_count = 9
+vqls = Vqls(ansatz_param_count, pauli_terms_structs, b, "3x3 exmaple")
+# %% 
 print("creating qprog")
 vqls.create_qrog()
 print("init optimizer")
@@ -92,6 +68,28 @@ print("optimizing")
 optimal_params = vqls.optimizer.optimize()
 print("evalutating ansatz")
 vqls.evaluate_ansatz(optimal_params)
-print("comparing results")
-vqls.compare_results(x)
 # %%
+
+A_num = pauli_operator_to_matrix(pauli_terms_structs) / normalization
+A_inv = np.linalg.inv(A_num)
+x = np.dot(A_inv, b)
+classical_probs = np.real((x / np.linalg.norm(x))) ** 2
+classical_probs
+# %%
+
+df = vqls.results.dataframe
+amplitudes = np.zeros(2**num_system_qubits).astype(complex)
+amplitudes[df.io] = df.amplitude
+# Preprocessed quantum solution: we know the solution is real, and that the last point is positive
+global_phase = np.angle(amplitudes[-1])
+amplitudes = np.real(amplitudes / np.exp(1j * global_phase))
+if (
+    amplitudes[-1] < 0
+):  # we can extract the solution up to a sign, align with the expected
+    amplitudes *= -1
+print(amplitudes)
+probabilities = amplitudes**2
+print(
+    "overlap =",
+    (b.dot(A_num.dot(amplitudes) / (np.linalg.norm(A_num.dot(amplitudes))))) ** 2,
+)
