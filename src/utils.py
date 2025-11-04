@@ -1,14 +1,16 @@
 import json
 import os
+from classiq.applications.hamiltonian.pauli_decomposition import hamiltonian_to_matrix
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.linalg import eigh, pinvh
 
 
 
 def save_stats_to_json(stats, filename="vqls_stats", folder="results"):
     """
     Save a dictionary of statistics to a JSON file.
-    """
+"""
     os.makedirs(folder, exist_ok=True)  # create folder if it doesn't exist
     filepath = os.path.join(folder, filename + ".json")
     with open(filepath, "w") as f:
@@ -22,7 +24,7 @@ def plot_classical_vs_quantum(
 ):
     """
     Plots classical and quantum probabilities side by side for comparison.
-    """
+"""
     os.makedirs("data", exist_ok=True)
 
     N = len(classical_probs)
@@ -69,7 +71,7 @@ def plot_classical_vs_quantum(
 def show_save_results(folder="data"):
     """
     Reads all JSON result files from a folder and plots each result.
-    """
+"""
     if not os.path.exists(folder):
         print(f"❌ Folder '{folder}' not found.")
         return
@@ -136,3 +138,16 @@ def laplacian_2d(Nx, Ny):
 
     return A
 
+def genrate_random_b(pauli_terms, seed=42, size=None):
+    A = hamiltonian_to_matrix(pauli_terms)
+    if seed is not None:
+        np.random.seed(seed)
+    if size is None:
+        size = A.shape[0]
+    eigenvalues, eigenvectors = eigh(A)
+    coeffs = np.random.rand(len(eigenvalues))
+    b = eigenvectors @ (coeffs * eigenvalues)
+    b /= np.linalg.norm(b)
+    x = np.linalg.solve(A, b)
+
+    return b, x, A

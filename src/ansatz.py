@@ -49,3 +49,32 @@ def apply_fixed_2_qubit_system_ansatz(angles: CArray[CReal], system_qubits: QArr
     # Layer 3: RY on both qubits
     RY(angles[4], system_qubits[0])
     RY(angles[5], system_qubits[1])
+
+@qfunc
+def apply_fixed_2_qubit_system_ansatz_updated(angles: CArray[CReal], system_qubits: QArray[QBit]):
+    # angles should be length 8 (4 layers of RY for 2 qubits)
+    
+    # --- Layer 1: RY on both qubits ---
+    RY(angles[0], system_qubits[0])
+    RY(angles[1], system_qubits[1])
+    
+    # --- Entangling layer 1 ---
+    CZ(system_qubits[0], system_qubits[1])
+    
+    # --- Layer 2: RY on both qubits ---
+    RY(angles[2], system_qubits[0])
+    RY(angles[3], system_qubits[1])
+    
+    # --- Entangling layer 2 (reverse) ---
+    CZ(system_qubits[1], system_qubits[0])
+    
+    # --- Layer 3: RY on both qubits ---
+    RY(angles[4], system_qubits[0])
+    RY(angles[5], system_qubits[1])
+    
+    # --- Additional entangling layer 3 ---
+    CZ(system_qubits[0], system_qubits[1])
+    
+    # --- Layer 4: RY on both qubits ---
+    RY(angles[6], system_qubits[0])
+    RY(angles[7], system_qubits[1])

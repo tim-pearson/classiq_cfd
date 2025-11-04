@@ -22,7 +22,7 @@ from classiq.applications.hamiltonian.pauli_decomposition import (
 from classiq.synthesis import synthesize
 import numpy as np
 
-from ansatz import apply_fixed_2_qubit_system_ansatz, apply_fixed_3_qubit_system_ansatz
+from ansatz import apply_fixed_2_qubit_system_ansatz, apply_fixed_2_qubit_system_ansatz_updated, apply_fixed_3_qubit_system_ansatz
 from block_encoding import block_encoding_vqls
 from optimizer import VqlsOptimizer
 from utils import plot_classical_vs_quantum, save_stats_to_json
@@ -35,7 +35,6 @@ class Vqls:
         self.name = name
         self.A = hamiltonian_to_matrix(pauli_terms_structs)
         self.num_system_qubits = pauli_terms_structs.num_qubits
-        # self.num_system_qubits = len(pauli_terms_structs[0].pauli)
         print(self.num_system_qubits)
         self.num_ancila_qubits = (
             len(pauli_terms_structs.terms) - 1
@@ -47,6 +46,12 @@ class Vqls:
         b /= np.linalg.norm(b)
         self.b = b
         self.probs = (b**2) / np.sum(b**2)
+
+        if np.imag(self.probs).sum() > 0.01:
+            raise Exception("probabilities and not real")
+        else:
+            self.probs = np.real(self.probs)
+
         self.backend = None
 
     def create_qrog(self, qmod_file=False):
@@ -68,6 +73,10 @@ class Vqls:
                 ansatz=lambda: apply_fixed_2_qubit_system_ansatz(
                     params, system_qubits
                 ),
+                # ansatz=lambda: apply_fixed_2_qubit_system_ansatz_updated(
+                #     params, system_qubits
+                # ),
+
                 # ansatz=lambda: apply_fixed_3_qubit_system_ansatz(
                 #     params, system_qubits
                 # ),
@@ -123,7 +132,7 @@ class Vqls:
         with ExecutionSession(qprog_3, self.execution_preferences) as es:
             self.results = es.sample()
 
-    def compare_results(self):
+    def compare_results(self, x):
         N = 2**self.num_system_qubits
 
         # --- 1) Get quantum amplitudes and probabilities ---
@@ -143,7 +152,7 @@ class Vqls:
         # --- 2) Classical solution ---
         A_num = self.A
         # b = np.ones(N) / np.sqrt(N)  # uniform RHS
-        x = np.linalg.solve(A_num, self.b)
+        print(" classical solution x  = ", x)
         classical_probs = np.real((x / np.linalg.norm(x))) ** 2
         self.classical_probs = classical_probs
 

@@ -17,7 +17,7 @@ from pandas.io.formats.style import plt
 from optimizer import VqlsOptimizer
 from vqls import Vqls
 from dotenv import load_dotenv
-from utils import laplacian_2d
+from utils import laplacian_2d, genrate_random_b
 
 # %%
 
@@ -66,32 +66,32 @@ pauli_pressure = (
     - 0.25 * Pauli.X(0) * Pauli.I(1)  # flips qubit 0 → connects |00>↔|10>, |01>↔|11>
     - 0.5 * Pauli.I(0) * Pauli.X(1)  # flips qubit 1 → connects |00>↔|01>, |10>↔|11>
 )
+
+pauli_pressure_2x2_norm = (
+    0.5 * Pauli.I(0) * Pauli.I(1)  
+    - 0.25 * Pauli.I(0) * Pauli.X(1)  
+    - 0.25 * Pauli.X(0) * Pauli.I(1)  
+)
 # %%
-m = hamiltonian_to_matrix(pauli_pressure)
-# %%
-# b = np.array([0.2, 0.1, 0.3, 0.15, 0.05, 0.1, 0.05, 0.05])
-# b /= np.linalg.norm(b)
-b = np.ones(4) / np.sqrt(4)
-# %%
-b_physical = np.array([0.25, 0.001, 0.001, 0.45])
-b_physical /= np.linalg.norm(b_physical)  # normalize for quantum state
+
 
 # %%
-A = hamiltonian_to_matrix(pauli_pressure)
-np.real(A)
-print(np.linalg.inv(A)@ b)
-# %%
-ansatz_param_count = 9
-vqls = Vqls(ansatz_param_count, pauli_pressure, b_physical, "2x2 pressure b with 0.001's")
+ansatz_param_count = 6
+b, x, A = genrate_random_b(pauli_pressure_2x2_norm)
+x = np.real(x)
+x = x /  np.linalg.norm(x)
+print("b = " , np.real(b))
+print("x = " , x )
+vqls = Vqls(ansatz_param_count, pauli_pressure_2x2_norm, b, "2x2 pressure b even super pos 2x2")
 # %%
 print("creating qprog")
 vqls.create_qrog()
 print("init optimizer")
-vqls.init_optimizer(2048, backend_preferences=backend_preferences)
+vqls.init_optimizer(204800, backend_preferences=backend_preferences)
 print("optimizing")
 optimal_params = vqls.optimizer.optimize()
 print("evalutating ansatz")
 vqls.evaluate_ansatz(optimal_params)
 print("comparing results")
-vqls.compare_results()
+vqls.compare_results(x)
 # %%
