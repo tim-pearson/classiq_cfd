@@ -82,6 +82,11 @@ amplitudes = np.real(amplitudes / np.exp(1j * global_phase))
 if amplitudes[-1] < 0:
     amplitudes *= -1
 
+print(
+    "CLASSIQS Overlap",
+    (b.dot(A_num.dot(amplitudes) / (np.linalg.norm(A_num.dot(amplitudes))))) ** 2,
+)
+
 print(f"VQLS amplitudes: {amplitudes}")
 
 # Normalize VQLS solution for comparison
