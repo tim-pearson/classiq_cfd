@@ -22,7 +22,7 @@ from classiq.applications.hamiltonian.pauli_decomposition import (
 from classiq.synthesis import synthesize
 import numpy as np
 
-from ansatz import apply_fixed_2_qubit_system_ansatz, apply_fixed_2_qubit_system_ansatz_updated, apply_fixed_3_qubit_system_ansatz
+from ansatz import apply_fixed_2_qubit_system_ansatz, apply_fixed_2_qubit_system_ansatz_updated, apply_fixed_3_qubit_system_ansatz, apply_improved_2_qubit_ansatz
 from block_encoding import block_encoding_vqls
 from optimizer import VqlsOptimizer
 from utils import fidelity, normalize, plot_classical_vs_quantum, save_stats_to_json
@@ -66,16 +66,20 @@ class Vqls:
             allocate(system_qubits)
 
             block_encoding_vqls(
-                ansatz=lambda: apply_fixed_2_qubit_system_ansatz(
-                    params, system_qubits
-                ),
+                # ansatz=lambda: apply_fixed_2_qubit_system_ansatz(
+                #     params, system_qubits
+                # ),
+                # ansatz=lambda: apply_improved_2_qubit_ansatz(
+
+                #     params, system_qubits
+                #     ),
                 # ansatz=lambda: apply_fixed_2_qubit_system_ansatz_updated(
                 #     params, system_qubits
                 # ),
 
-                # ansatz=lambda: apply_fixed_3_qubit_system_ansatz(
-                #     params, system_qubits
-                # ),
+                ansatz=lambda: apply_fixed_3_qubit_system_ansatz(
+                    params, system_qubits
+                ),
                 block_encoding=lambda: lcu_pauli(
                     operator=self.pauli_terms_structs,
                     data=system_qubits,
@@ -116,17 +120,15 @@ class Vqls:
         @qfunc
         def main(io: Output[QNum[self.num_system_qubits]]):
             allocate(io)
-            # apply_fixed_3_qubit_system_ansatz(
-            #     list(optimal_params.values()), io
-            # )
-            apply_fixed_2_qubit_system_ansatz(
+            apply_fixed_3_qubit_system_ansatz(
                 list(optimal_params.values()), io
             )
+            # apply_improved_2_qubit_ansatz(
+            #     list(optimal_params.values()), io
+            # )
 
         qprog_3 = synthesize(main)
 
         with ExecutionSession(qprog_3, self.execution_preferences) as es:
             self.results = es.sample()
-
-
 

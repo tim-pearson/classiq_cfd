@@ -63,3 +63,26 @@ b_solvable /= np.linalg.norm(b_solvable)
 print("\nGuaranteed solvable b:", b_solvable)
 x_solvable = np.linalg.solve(A, b_solvable)
 print("Solution x:", x_solvable)
+# %%
+def check_ansatz_expressibility(target_state, num_params=6):
+    """Check if ansatz can approximate the target state"""
+    print("\n=== Ansatz Expressibility Check ===")
+    
+    # For 2-qubit RY-only ansatz, the amplitudes have constraints:
+    # The pattern is determined by tensor products of real rotations
+    
+    # Check if target has the right pattern for real-only ansatz
+    target_norm = target_state / np.linalg.norm(target_state)
+    
+    print("Target state pattern:")
+    for i, amp in enumerate(target_norm):
+        print(f"|{i:02b}⟩: {amp:7.4f} {'✓' if abs(amp.imag) < 1e-10 else '✗ (complex)'}")
+    
+    # For RY-only ansatz, all amplitudes should be real
+    if np.max(np.abs(target_norm.imag)) > 1e-10:
+        print("WARNING: Target has complex amplitudes but RY ansatz produces only real!")
+        print("Consider using RZ gates for phase control.")
+
+# Add this before optimization:x
+x=[-0.29128408,-0.8323651,0.13335101,0.45226036]
+check_ansatz_expressibility(x)

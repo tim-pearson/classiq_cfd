@@ -78,3 +78,22 @@ def apply_fixed_2_qubit_system_ansatz_updated(angles: CArray[CReal], system_qubi
     # --- Layer 4: RY on both qubits ---
     RY(angles[6], system_qubits[0])
     RY(angles[7], system_qubits[1])
+
+@qfunc
+def apply_improved_2_qubit_ansatz(angles: CArray[CReal], system_qubits: QArray[QBit]):
+    # Layer 1: Initial rotations with phase control
+    RY(angles[0], system_qubits[0])
+    RZ(angles[1], system_qubits[0])  # Phase control for qubit 0
+    RY(angles[2], system_qubits[1])
+    RZ(angles[3], system_qubits[1])  # Phase control for qubit 1
+    
+    # Entangling layer
+    CZ(system_qubits[0], system_qubits[1])
+    
+    # Layer 2: Fine-tuning
+    RY(angles[4], system_qubits[0])
+    RY(angles[5], system_qubits[1])
+    
+    # Final phase adjustments if needed
+    # RZ(angles[6], system_qubits[0])
+    # RZ(angles[7], system_qubits[1])

@@ -36,14 +36,15 @@ tk = os.environ["IBMQ_API_KEY"]
 # )
 
 
-backend_preferences = ClassiqBackendPreferences(backend_name="simulator_statevector")
-
+backend_preferences = ClassiqBackendPreferences(
+    backend_name="simulator_statevector"
+)
 
 
 pauli_pressure = (
-    0.5 * Pauli.I(0) * Pauli.I(1)  
-    - 0.25 * Pauli.I(0) * Pauli.X(1)  
-    - 0.25 * Pauli.X(0) * Pauli.I(1)  
+    0.5 * Pauli.I(0) * Pauli.I(1)
+    - 0.25 * Pauli.I(0) * Pauli.X(1)
+    - 0.25 * Pauli.X(0) * Pauli.I(1)
 )
 # %%
 pauli_terms_structs = (
@@ -53,25 +54,31 @@ pauli_terms_structs = (
 )
 normalization = sum([p.coefficient for p in pauli_terms_structs.terms])
 
-num_system_qubits = pauli_terms_structs.num_qubits
-
 
 # %%
 p = pauli_terms_structs
-A_num = pauli_operator_to_matrix(p) / normalization
+A_num = pauli_operator_to_matrix(p)
+if normalization != 0:
+    A_num = A_num / normalization
+epsilon = 1e-6
+A_reg = A_num + epsilon * np.eye(A_num.shape[0])
+A_num = A_reg
+print(A_num)
 A_inv = np.linalg.inv(A_num)
 b = genrate_random_b(A_num)
 x = np.dot(A_inv, b.T)
 classical_probs = np.real((x / np.linalg.norm(x))) ** 2
 # %%
 ansatz_param_count = 9
-vqls = Vqls(ansatz_param_count, p, b, input("chose test name"))
-# %% 
+num_system_qubits = p.num_qubits
+vqls = Vqls(ansatz_param_count, p, b, "blank")
+# %%
 print("creating qprog")
 vqls.create_qrog()
 print("init optimizer")
 vqls.init_optimizer(204800, backend_preferences=backend_preferences)
 print("optimizing")
+# optimal_params = vqls.optimizer.optimize_with_better_settings()
 optimal_params = vqls.optimizer.optimize()
 print("evalutating ansatz")
 vqls.evaluate_ansatz(optimal_params)
@@ -80,16 +87,41 @@ vqls.evaluate_ansatz(optimal_params)
 df = vqls.results.dataframe
 amplitudes = np.zeros(2**num_system_qubits).astype(complex)
 amplitudes[df.io] = df.amplitude
-# Preprocessed quantum solution: we know the solution is real, and that the last point is positive
 global_phase = np.angle(amplitudes[-1])
 amplitudes = np.real(amplitudes / np.exp(1j * global_phase))
-if (
-    amplitudes[-1] < 0
-):  
+if amplitudes[-1] < 0:
     amplitudes *= -1
 print(amplitudes)
 probabilities = amplitudes**2
+
 print(
     "overlap =",
-    (b.dot(A_num.dot(amplitudes) / (np.linalg.norm(A_num.dot(amplitudes))))) ** 2,
+    (b.dot(A_num.dot(amplitudes) / (np.linalg.norm(A_num.dot(amplitudes)))))
+    ** 2,
 )
+# %%
+
+print("\n--- Comparison: VQLS vs Classical ---")
+
+# Classical solution (exact)
+x_classical = np.dot(A_inv, b.T)
+x_classical = x_classical.real  # Take real part
+x_classical /= np.linalg.norm(x_classical)  # Normalize
+print(x_classical)
+
+# VQLS solution (estimated)
+x_vqls = amplitudes  # From your VQLS results
+
+# Print both solutions
+print("Classical x (exact):")
+print(np.array2string(x_classical, precision=4, suppress_small=True))
+print("\nVQLS x (estimated):")
+print(np.array2string(x_vqls, precision=4, suppress_small=True))
+
+# Calculate and print the error
+error = np.linalg.norm(x_classical - x_vqls)
+print(f"\nL2 Error: {error:.4f}")
+
+# Calculate the overlap (fidelity)
+overlap = np.abs(x_classical.dot(x_vqls)) ** 2
+print(f"Overlap (fidelity): {overlap:.4f}")
