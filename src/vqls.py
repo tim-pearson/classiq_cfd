@@ -25,7 +25,12 @@ import numpy as np
 from ansatz import ansatz_2_enhanced
 from block_encoding import block_encoding_vqls
 from optimizer import VqlsOptimizer
-from utils import fidelity, normalize, plot_classical_vs_quantum, save_stats_to_json
+from utils import (
+    fidelity,
+    normalize,
+    plot_classical_vs_quantum,
+    save_stats_to_json,
+)
 
 DATA_DIR = "data/"
 
@@ -70,9 +75,7 @@ class Vqls:
                 # ansatz=lambda: apply_fixed_2_qubit_system_ansatz(
                 #     params, system_qubits
                 # ),
-                ansatz=lambda: ansatz_2_enhanced(
-                    params, system_qubits
-                ),
+                ansatz=lambda: ansatz_2_enhanced(params, system_qubits),
                 block_encoding=lambda: lcu_pauli(
                     operator=self.pauli_terms_structs,
                     data=system_qubits,
@@ -120,10 +123,7 @@ class Vqls:
 
             #     list(optimal_params.values()), io
             #         )
-            apply_fixed_2_qubit_system_ansatz_updated(
-
-                list(optimal_params.values()), io
-                    )
+            ansatz_2_enhanced(list(optimal_params.values()), io)
 
             # apply_improved_2_qubit_ansatz(
             #     list(optimal_params.values()), io
@@ -133,4 +133,3 @@ class Vqls:
 
         with ExecutionSession(qprog_3, self.execution_preferences) as es:
             self.results = es.sample()
-
