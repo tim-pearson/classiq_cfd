@@ -1,4 +1,4 @@
-from classiq import CZ, RY, CArray, CReal, QArray, QBit, qfunc, repeat
+from classiq import CX, CZ, RY, RZ, U, CArray, CReal, QArray, QBit, qfunc, repeat
 
 
 @qfunc()
@@ -27,73 +27,81 @@ def apply_fixed_3_qubit_system_ansatz(
     apply_ry_on_all([angles[6], angles[7], angles[8]], system_qubits)
 
 
-
 @qfunc
-def apply_fixed_2_qubit_system_ansatz(angles: CArray[CReal], system_qubits: QArray[QBit]):
+def apply_fixed_2_qubit_system_ansatz(
+    angles: CArray[CReal], system_qubits: QArray[QBit]
+):
     # angles should be length 6 (3 layers of RY for 2 qubits)
-    
+
     # Layer 1: RY on both qubits
     RY(angles[0], system_qubits[0])
     RY(angles[1], system_qubits[1])
-    
+
     # Entangling layer
     CZ(system_qubits[0], system_qubits[1])
-    
+
     # Layer 2: RY on both qubits
     RY(angles[2], system_qubits[0])
     RY(angles[3], system_qubits[1])
-    
+
     # Entangling layer (optional: flip CZ direction)
     CZ(system_qubits[1], system_qubits[0])
-    
+
     # Layer 3: RY on both qubits
     RY(angles[4], system_qubits[0])
     RY(angles[5], system_qubits[1])
 
 @qfunc
-def apply_fixed_2_qubit_system_ansatz_updated(angles: CArray[CReal], system_qubits: QArray[QBit]):
-    # angles should be length 8 (4 layers of RY for 2 qubits)
+def ansatz_2_enhanced(
+    angles: CArray[CReal], system_qubits: QArray[QBit]
+):
+    """
+    Enhanced 2-qubit ansatz with better expressivity
+    angles: length 12 for full expressivity
+    """
+    # Layer 1: Full single-qubit rotations
+    U(angles[0], angles[1], angles[2], 0, system_qubits[0])  # U3 gate
+    U(angles[3], angles[4], angles[5], 0, system_qubits[1])  # U3 gate
     
-    # --- Layer 1: RY on both qubits ---
+    # Entangling layer 1
+    CX(system_qubits[0], system_qubits[1])
+    
+    # Layer 2: Single-qubit rotations
+    RY(angles[6], system_qubits[0])
+    RY(angles[7], system_qubits[1])
+    
+    # Entangling layer 2
+    CZ(system_qubits[1], system_qubits[0])
+    
+    # Layer 3: Final rotations
+    RZ(angles[8], system_qubits[0])
+    RZ(angles[9], system_qubits[1])
+    RY(angles[10], system_qubits[0])
+    RY(angles[11], system_qubits[1])
+
+@qfunc  
+def ansatz_2_simp(
+    angles: CArray[CReal], system_qubits: QArray[QBit]
+):
+    """
+    Simpler but effective 2-qubit ansatz (8 parameters)
+    """
+    # Layer 1
     RY(angles[0], system_qubits[0])
     RY(angles[1], system_qubits[1])
     
-    # --- Entangling layer 1 ---
-    CZ(system_qubits[0], system_qubits[1])
+    # Entanglement
+    CX(system_qubits[0], system_qubits[1])
     
-    # --- Layer 2: RY on both qubits ---
+    # Layer 2  
     RY(angles[2], system_qubits[0])
     RY(angles[3], system_qubits[1])
+    RZ(angles[4], system_qubits[0])
+    RZ(angles[5], system_qubits[1])
     
-    # --- Entangling layer 2 (reverse) ---
-    CZ(system_qubits[1], system_qubits[0])
+    # Final entanglement
+    CX(system_qubits[1], system_qubits[0])
     
-    # --- Layer 3: RY on both qubits ---
-    RY(angles[4], system_qubits[0])
-    RY(angles[5], system_qubits[1])
-    
-    # --- Additional entangling layer 3 ---
-    CZ(system_qubits[0], system_qubits[1])
-    
-    # --- Layer 4: RY on both qubits ---
+    # Final layer
     RY(angles[6], system_qubits[0])
     RY(angles[7], system_qubits[1])
-
-@qfunc
-def apply_improved_2_qubit_ansatz(angles: CArray[CReal], system_qubits: QArray[QBit]):
-    # Layer 1: Initial rotations with phase control
-    RY(angles[0], system_qubits[0])
-    RZ(angles[1], system_qubits[0])  # Phase control for qubit 0
-    RY(angles[2], system_qubits[1])
-    RZ(angles[3], system_qubits[1])  # Phase control for qubit 1
-    
-    # Entangling layer
-    CZ(system_qubits[0], system_qubits[1])
-    
-    # Layer 2: Fine-tuning
-    RY(angles[4], system_qubits[0])
-    RY(angles[5], system_qubits[1])
-    
-    # Final phase adjustments if needed
-    # RZ(angles[6], system_qubits[0])
-    # RZ(angles[7], system_qubits[1])

@@ -18,7 +18,7 @@ from pandas.io.formats.style import plt
 from optimizer import VqlsOptimizer
 from vqls import Vqls
 from dotenv import load_dotenv
-from utils import laplacian_2d, genrate_random_b
+from utils import create_poisson_matrix_pauli, generate_guaranteed_b, laplacian_2d, genrate_random_b, normalize
 
 # %%
 
@@ -52,24 +52,20 @@ pauli_terms_structs = (
     + 0.225 * Pauli.I(0) * Pauli.Z(1) * Pauli.I(2)
     + 0.225 * Pauli.I(0) * Pauli.I(1) * Pauli.Z(2)
 )
-normalization = sum([p.coefficient for p in pauli_terms_structs.terms])
 
 
 # %%
-p = pauli_terms_structs
-A_num = pauli_operator_to_matrix(p)
-if normalization != 0:
-    A_num = A_num / normalization
-epsilon = 1e-6
-A_reg = A_num + epsilon * np.eye(A_num.shape[0])
-A_num = A_reg
+# p = pauli_pressure
+# A_num = pauli_operator_to_matrix(p)
+p, A_num = create_poisson_matrix_pauli(2)
 print(A_num)
 A_inv = np.linalg.inv(A_num)
-b = genrate_random_b(A_num)
+b = generate_guaranteed_b(A_num)
 x = np.dot(A_inv, b.T)
+print("x = " , x )
 classical_probs = np.real((x / np.linalg.norm(x))) ** 2
 # %%
-ansatz_param_count = 9
+ansatz_param_count = 12
 num_system_qubits = p.num_qubits
 vqls = Vqls(ansatz_param_count, p, b, "blank")
 # %%
@@ -108,6 +104,13 @@ x_classical = np.dot(A_inv, b.T)
 x_classical = x_classical.real  # Take real part
 x_classical /= np.linalg.norm(x_classical)  # Normalize
 print(x_classical)
+est = A_num.dot(amplitudes)
+est = est / np.linalg.norm(est)
+est
+sol = A_num.dot(x_classical)
+sol = sol / np.linalg.norm(sol)
+np.real(sol)
+print(np.real(b / np.linalg.norm(b)))
 
 # VQLS solution (estimated)
 x_vqls = amplitudes  # From your VQLS results
@@ -125,3 +128,6 @@ print(f"\nL2 Error: {error:.4f}")
 # Calculate the overlap (fidelity)
 overlap = np.abs(x_classical.dot(x_vqls)) ** 2
 print(f"Overlap (fidelity): {overlap:.4f}")
+# %%
+
+

@@ -22,7 +22,7 @@ from classiq.applications.hamiltonian.pauli_decomposition import (
 from classiq.synthesis import synthesize
 import numpy as np
 
-from ansatz import apply_fixed_2_qubit_system_ansatz, apply_fixed_2_qubit_system_ansatz_updated, apply_fixed_3_qubit_system_ansatz, apply_improved_2_qubit_ansatz
+from ansatz import ansatz_2_enhanced
 from block_encoding import block_encoding_vqls
 from optimizer import VqlsOptimizer
 from utils import fidelity, normalize, plot_classical_vs_quantum, save_stats_to_json
@@ -33,7 +33,8 @@ DATA_DIR = "data/"
 class Vqls:
     def __init__(self, ansatz_param_count, pauli_terms_structs, b, name):
         self.name = name
-        self.num_system_qubits = pauli_terms_structs.num_qubits
+        # self.num_system_qubits = pauli_terms_structs.num_qubits
+        self.num_system_qubits = 2
         print(self.num_system_qubits)
         self.num_ancila_qubits = (
             len(pauli_terms_structs.terms) - 1
@@ -69,15 +70,7 @@ class Vqls:
                 # ansatz=lambda: apply_fixed_2_qubit_system_ansatz(
                 #     params, system_qubits
                 # ),
-                # ansatz=lambda: apply_improved_2_qubit_ansatz(
-
-                #     params, system_qubits
-                #     ),
-                # ansatz=lambda: apply_fixed_2_qubit_system_ansatz_updated(
-                #     params, system_qubits
-                # ),
-
-                ansatz=lambda: apply_fixed_3_qubit_system_ansatz(
+                ansatz=lambda: ansatz_2_enhanced(
                     params, system_qubits
                 ),
                 block_encoding=lambda: lcu_pauli(
@@ -120,9 +113,18 @@ class Vqls:
         @qfunc
         def main(io: Output[QNum[self.num_system_qubits]]):
             allocate(io)
-            apply_fixed_3_qubit_system_ansatz(
+            # apply_fixed_3_qubit_system_ansatz(
+            #     list(optimal_params.values()), io
+            # )
+            # apply_fixed_2_qubit_system_ansatz(
+
+            #     list(optimal_params.values()), io
+            #         )
+            apply_fixed_2_qubit_system_ansatz_updated(
+
                 list(optimal_params.values()), io
-            )
+                    )
+
             # apply_improved_2_qubit_ansatz(
             #     list(optimal_params.values()), io
             # )

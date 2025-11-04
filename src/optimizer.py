@@ -93,7 +93,7 @@ class VqlsOptimizer:
         random.seed(1000)
 
         # Better initialization - try multiple small perturbations
-        base_params = [0.125, -0.213, 0.089, 0.047, -0.25, 0.165, 0.01, -0.01, 0.2]
+        base_params = [0.125, -0.213, 0.089, 0.047, -0.25, 0.165, 0.01, -0.01]
         initial_params = [
             p + random.uniform(-0.05, 0.05)
             for p in base_params[: self.ansatz_param_count]

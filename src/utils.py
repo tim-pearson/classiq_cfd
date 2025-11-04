@@ -1,6 +1,6 @@
 import json
 import os
-from classiq.applications.hamiltonian.pauli_decomposition import hamiltonian_to_matrix
+from classiq.applications.hamiltonian.pauli_decomposition import hamiltonian_to_matrix, matrix_to_hamiltonian, matrix_to_pauli_operator
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.linalg import eigh, pinvh
@@ -151,7 +151,40 @@ def genrate_random_b(A, seed=42, size=None):
 
     return b
 
-
+def generate_guaranteed_b(A, seed=42):
+    """Absolutely guaranteed to work for any non-zero matrix"""
+    np.random.seed(seed)
+    
+    # Method 1: Direct column space construction (most robust)
+    x_random = np.random.randn(A.shape[1])
+    b = A @ x_random
+    
+    # Check if we got zero vector (if A is zero matrix or x in null space)
+    b_norm = np.linalg.norm(b)
+    if b_norm < 1e-12:
+        # Try a few more random vectors
+        for attempt in range(10):
+            x_random = np.random.randn(A.shape[1])
+            b = A @ x_random
+            b_norm = np.linalg.norm(b)
+            if b_norm > 1e-12:
+                break
+        
+        if b_norm < 1e-12:
+            raise ValueError("Matrix A appears to be zero matrix!")
+    
+    b /= b_norm
+    
+    # Verify b is valid
+    try:
+        # Use least-squares to handle rank-deficient cases
+        x_solution, residual, rank, s = np.linalg.lstsq(A, b, rcond=None)
+        if residual.size > 0 and residual[0] > 1e-8:
+            print(f"Warning: Large residual {residual[0]:.2e} - matrix may be ill-conditioned")
+    except:
+        pass
+    
+    return b
 
 def make_real_if_close(vec, tol=1e-8):
     """If imaginary parts are small compared to tol, return real part; otherwise return original."""
@@ -203,3 +236,28 @@ def get_solution_from_results(results, num_system_qubits):
     #     amplitudes = np.real(amplitudes)
 
     return amplitudes
+
+def create_poisson_matrix_pauli(n_qubits):
+    """
+    Create 1D Poisson matrix and convert to Pauli decomposition
+    This is the most reliable method
+    """
+    import numpy as np
+    from scipy.sparse import diags
+    
+    # Matrix size
+    N = 2**n_qubits
+    
+    # Create 1D Poisson matrix
+    main_diag = 2.0 * np.ones(N)
+    off_diag = -1.0 * np.ones(N-1)
+    A_poisson = diags([off_diag, main_diag, off_diag], [-1, 0, 1], shape=(N, N)).toarray()
+    
+    print(f"Poisson matrix ({N}x{N}):")
+    print(A_poisson)
+    
+    # Convert to Pauli operator
+    pauli_operator = matrix_to_pauli_operator(A_poisson)
+    
+    
+    return pauli_operator, A_poisson
