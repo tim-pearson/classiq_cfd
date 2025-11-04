@@ -55,10 +55,17 @@ normalization = sum([p.coefficient for p in pauli_terms_structs.terms])
 
 num_system_qubits = pauli_terms_structs.num_qubits
 
+
 # %%
-b = np.ones(8) / np.sqrt(8)
+p = pauli_terms_structs
+A_num = pauli_operator_to_matrix(p) / normalization
+A_inv = np.linalg.inv(A_num)
+b = genrate_random_b(A_num)
+x = np.dot(A_inv, b.T)
+classical_probs = np.real((x / np.linalg.norm(x))) ** 2
+# %%
 ansatz_param_count = 9
-vqls = Vqls(ansatz_param_count, pauli_terms_structs, b, "3x3 exmaple")
+vqls = Vqls(ansatz_param_count, p, b, input("chose test name"))
 # %% 
 print("creating qprog")
 vqls.create_qrog()
@@ -70,13 +77,6 @@ print("evalutating ansatz")
 vqls.evaluate_ansatz(optimal_params)
 # %%
 
-A_num = pauli_operator_to_matrix(pauli_terms_structs) / normalization
-A_inv = np.linalg.inv(A_num)
-x = np.dot(A_inv, b)
-classical_probs = np.real((x / np.linalg.norm(x))) ** 2
-classical_probs
-# %%
-
 df = vqls.results.dataframe
 amplitudes = np.zeros(2**num_system_qubits).astype(complex)
 amplitudes[df.io] = df.amplitude
@@ -85,7 +85,7 @@ global_phase = np.angle(amplitudes[-1])
 amplitudes = np.real(amplitudes / np.exp(1j * global_phase))
 if (
     amplitudes[-1] < 0
-):  # we can extract the solution up to a sign, align with the expected
+):  
     amplitudes *= -1
 print(amplitudes)
 probabilities = amplitudes**2

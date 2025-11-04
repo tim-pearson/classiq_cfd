@@ -138,8 +138,7 @@ def laplacian_2d(Nx, Ny):
 
     return A
 
-def genrate_random_b(pauli_terms, seed=42, size=None):
-    A = hamiltonian_to_matrix(pauli_terms)
+def genrate_random_b(A, seed=42, size=None):
     if seed is not None:
         np.random.seed(seed)
     if size is None:
@@ -150,7 +149,7 @@ def genrate_random_b(pauli_terms, seed=42, size=None):
     b /= np.linalg.norm(b)
     x = np.linalg.solve(A, b)
 
-    return b, x, A
+    return b
 
 
 
