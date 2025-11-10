@@ -54,11 +54,11 @@ def make_divergence_free_1d_iterative(u, dx=1.0, max_iter=20, tol=1e-6):
 
     for it in range(max_iter):
         # Jacobi iteration for interior pressures
-        for i in range(1, N-1):
+        for i in range(1, N -1):
             p_new[i] = 0.5 * (p[i-1] + p[i+1] - dx * div[i])
         # boundaries remain zero
-        p_new[0] = 0
-        p_new[-1] = 0
+        # p_new[0] = 0
+        # p_new[-1] = 0
         
         # check convergence
         if np.max(np.abs(p_new - p)) < tol:

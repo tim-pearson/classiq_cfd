@@ -2,7 +2,7 @@ import numpy as np
 from interactive_mac import interactive_mac_grid
 from plot_fixed import show_before_after
 
-N = 8
+N = 4
 u_init = np.ones(N+1)*0.5
 u_init[3] = -0.2
 
@@ -23,5 +23,5 @@ np.random.uniform(-1, 1, 9)]
 u[:][0] = -1  # fix boundaries
 u[:][-1] = 1
 # for v in u:
-show_before_after(u[0])
+show_before_after(np.array([0.2, -0.3, 0.0, 0.5, 0.07]))
 
