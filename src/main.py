@@ -53,11 +53,11 @@ print(f"Verification error: {np.linalg.norm(Ax_classical - b):.2e}")
 x_classical_normalized = x_classical / np.linalg.norm(x_classical)
 
 # VQLS setup
-ansatz_param_count = 12
+ansatz_param_count = 8
 num_system_qubits = p.num_qubits
 
 # %%
-vqls = Vqls(ansatz_param_count, p, b, "blank")
+vqls = Vqls(ansatz_param_count, p, b, "A")
 
 print("Creating quantum program...")
 vqls.create_qrog()

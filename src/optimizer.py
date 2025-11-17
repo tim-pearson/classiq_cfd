@@ -31,7 +31,7 @@ class VqlsOptimizer:
         Compute expectation value from Hadamard test results
         Returns ⟨Z_ancilla⟩ = P(ancilla=0) - P(ancilla=1)
         This gives Re(⟨ψ|U|ψ⟩) or Im(⟨ψ|U|ψ⟩) depending on the circuit
-        """
+"""
         ancilla_0_count = 0
         ancilla_1_count = 0
         total_shots = 0
@@ -56,15 +56,6 @@ class VqlsOptimizer:
 
         return expectation
 
-    def get_cond_prop(self, res):
-        aux_prob_0 = 0
-        all_prob_0 = 0
-        for s in res:
-            if s.state[self.aux_var_name] == 0:
-                aux_prob_0 += s.shots
-                if s.state[self.ansatz_var_name] == 0:
-                    all_prob_0 += s.shots
-        return all_prob_0 / aux_prob_0
 
     def get_vqls_cost(self, res):
         expectation = self.get_hadamard_expectation(res)  # in [-1,1]

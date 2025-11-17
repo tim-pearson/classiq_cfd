@@ -27,29 +27,6 @@ def apply_fixed_3_qubit_system_ansatz(
     apply_ry_on_all([angles[6], angles[7], angles[8]], system_qubits)
 
 
-@qfunc
-def apply_fixed_2_qubit_system_ansatz(
-    angles: CArray[CReal], system_qubits: QArray[QBit]
-):
-    # angles should be length 6 (3 layers of RY for 2 qubits)
-
-    # Layer 1: RY on both qubits
-    RY(angles[0], system_qubits[0])
-    RY(angles[1], system_qubits[1])
-
-    # Entangling layer
-    CZ(system_qubits[0], system_qubits[1])
-
-    # Layer 2: RY on both qubits
-    RY(angles[2], system_qubits[0])
-    RY(angles[3], system_qubits[1])
-
-    # Entangling layer (optional: flip CZ direction)
-    CZ(system_qubits[1], system_qubits[0])
-
-    # Layer 3: RY on both qubits
-    RY(angles[4], system_qubits[0])
-    RY(angles[5], system_qubits[1])
 
 @qfunc
 def ansatz_2_enhanced(
@@ -78,30 +55,23 @@ def ansatz_2_enhanced(
     RZ(angles[9], system_qubits[1])
     RY(angles[10], system_qubits[0])
     RY(angles[11], system_qubits[1])
-
-@qfunc  
-def ansatz_2_simp(
-    angles: CArray[CReal], system_qubits: QArray[QBit]
-):
+@qfunc
+def ansatz_2_efficient(angles: CArray[CReal], system_qubits: QArray[QBit]):
     """
-    Simpler but effective 2-qubit ansatz (8 parameters)
+    Efficient 2-qubit ansatz with 8 parameters
+    Still maintains good expressibility with reduced parameter space
     """
-    # Layer 1
+    # Layer 1: Single-qubit rotations (4 params)
     RY(angles[0], system_qubits[0])
     RY(angles[1], system_qubits[1])
+    RZ(angles[2], system_qubits[0])
+    RZ(angles[3], system_qubits[1])
     
-    # Entanglement
+    # Entangling layer (1 entangling gate)
     CX(system_qubits[0], system_qubits[1])
     
-    # Layer 2  
-    RY(angles[2], system_qubits[0])
-    RY(angles[3], system_qubits[1])
-    RZ(angles[4], system_qubits[0])
-    RZ(angles[5], system_qubits[1])
-    
-    # Final entanglement
-    CX(system_qubits[1], system_qubits[0])
-    
-    # Final layer
-    RY(angles[6], system_qubits[0])
-    RY(angles[7], system_qubits[1])
+    # Layer 2: Single-qubit rotations (4 params)
+    RY(angles[4], system_qubits[0])
+    RY(angles[5], system_qubits[1])
+    RZ(angles[6], system_qubits[0])
+    RZ(angles[7], system_qubits[1])

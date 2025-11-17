@@ -10,7 +10,7 @@ def make_divergence_free_1d(u, dx=1.0):
     """
     Make 1D face-centered velocity u divergence-free using Poisson solve.
     u: array of length N+1 (N cells)
-    """
+"""
     N = len(u)-1
     div = u[1:] - u[:-1]   # divergence at cells
 
@@ -44,7 +44,7 @@ def make_divergence_free_1d_iterative(u, dx=1.0, max_iter=20, tol=1e-6):
     dx: cell size
     max_iter: max Jacobi iterations
     tol: stop if max divergence < tol
-    """
+"""
     N = len(u) - 1  # number of cells
     div = u[1:] - u[:-1]  # initial divergence
 
@@ -75,7 +75,7 @@ def make_divergence_free_1d_iterative(u, dx=1.0, max_iter=20, tol=1e-6):
 def plot_mac_fixed(u, dx=1.0, title="1D MAC Grid", show_arrows=True):
     """
     Plot a fixed MAC grid: velocity arrows + divergence bars.
-    """
+"""
     N = len(u)-1
     x_faces = np.linspace(0, N, N+1)
     x_cells = (x_faces[:-1] + x_faces[1:])/2
@@ -114,4 +114,41 @@ def plot_mac_fixed(u, dx=1.0, title="1D MAC Grid", show_arrows=True):
     
     plt.tight_layout()
     return fig, ax
+
+
+
+def make_divergence_free_2d(u, v, dx=1.0, dy=1.0, max_iter=5000, tol=1e-8):
+    """
+    Make a 2D MAC velocity field divergence-free using Jacobi pressure solve.
+    u: (Nx+1, Ny)
+    v: (Nx, Ny+1)
+    """
+    Nx, Ny = u.shape[0]-1, v.shape[1]-1
+    # Compute divergence at cell centers
+    div = (u[1:, :] - u[:-1, :]) / dx + (v[:, 1:] - v[:, :-1]) / dy
+    # Pressure at cell centers
+    p = np.zeros((Nx, Ny))
+    p_new = np.zeros_like(p)
+
+    for _ in range(max_iter):
+        for i in range(1, Nx-1):
+            for j in range(1, Ny-1):
+                p_new[i,j] = 0.25*(p[i+1,j]+p[i-1,j]+p[i,j+1]+p[i,j-1]-div[i,j]*dx*dy)
+        # Neumann BCs (dp/dn=0)
+        p_new[0,:] = p_new[1,:]
+        p_new[-1,:] = p_new[-2,:]
+        p_new[:,0] = p_new[:,1]
+        p_new[:,-1] = p_new[:,-2]
+        # Convergence check
+        if np.max(np.abs(p_new - p)) < tol:
+            break
+        p[:] = p_new
+
+    # Correct velocities
+    u_corr = u.copy()
+    v_corr = v.copy()
+    u_corr[1:-1,:] -= (p[1:,:]-p[:-1,:])/dx
+    v_corr[:,1:-1] -= (p[:,1:]-p[:,:-1])/dy
+
+    return u_corr, v_corr
 

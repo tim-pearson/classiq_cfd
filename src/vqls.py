@@ -22,7 +22,7 @@ from classiq.applications.hamiltonian.pauli_decomposition import (
 from classiq.synthesis import synthesize
 import numpy as np
 
-from ansatz import ansatz_2_enhanced
+from ansatz import ansatz_2_efficient, ansatz_2_enhanced
 from block_encoding import block_encoding_vqls
 from optimizer import VqlsOptimizer
 from utils import (
@@ -75,7 +75,8 @@ class Vqls:
                 # ansatz=lambda: apply_fixed_2_qubit_system_ansatz(
                 #     params, system_qubits
                 # ),
-                ansatz=lambda: ansatz_2_enhanced(params, system_qubits),
+                # ansatz=lambda: ansatz_2_enhanced(params, system_qubits),
+                ansatz=lambda: ansatz_2_efficient(params, system_qubits),
                 block_encoding=lambda: lcu_pauli(
                     operator=self.pauli_terms_structs,
                     data=system_qubits,
@@ -123,7 +124,8 @@ class Vqls:
 
             #     list(optimal_params.values()), io
             #         )
-            ansatz_2_enhanced(list(optimal_params.values()), io)
+            # ansatz_2_enhanced(list(optimal_params.values()), io)
+            ansatz_2_efficient(list(optimal_params.values()), io)
 
             # apply_improved_2_qubit_ansatz(
             #     list(optimal_params.values()), io
