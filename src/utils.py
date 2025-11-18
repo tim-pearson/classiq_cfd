@@ -9,8 +9,9 @@ from classiq.applications.hamiltonian.pauli_decomposition import (
 from classiq import *
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.linalg import eigh, pinvh
+from scipy.linalg import eigh,  pinvh
 from scipy.optimize import minimize
+from scipy.sparse import diags, eye, kron
 
 from ansatz import ansatz_4_hardware
 
@@ -18,7 +19,7 @@ from ansatz import ansatz_4_hardware
 def save_stats_to_json(stats, filename="vqls_stats", folder="results"):
     """
     Save a dictionary of statistics to a JSON file.
-    """
+"""
     os.makedirs(folder, exist_ok=True)  # create folder if it doesn't exist
     filepath = os.path.join(folder, filename + ".json")
     with open(filepath, "w") as f:
@@ -33,7 +34,7 @@ def plot_classical_vs_quantum(
 ):
     """
     Plots classical and quantum probabilities side by side for comparison.
-    """
+"""
     os.makedirs("data", exist_ok=True)
 
     N = len(classical_probs)
@@ -79,7 +80,7 @@ def plot_classical_vs_quantum(
 def show_save_results(folder="data"):
     """
     Reads all JSON result files from a folder and plots each result.
-    """
+"""
     if not os.path.exists(folder):
         print(f"❌ Folder '{folder}' not found.")
         return
@@ -112,62 +113,11 @@ def show_save_results(folder="data"):
         plot_classical_vs_quantum(classical_probs, quantum_probs, name=name)
 
 
-def laplacian_2d(Nx, Ny):
-    N = Nx * Ny
-    A = np.zeros((N, N))
-
-    # Main diagonal = number of neighbors per cell
-    main_diag = np.full(N, 4)
-
-    # Adjust for edges/corners
-    for i in range(Nx):
-        for j in range(Ny):
-            idx = i * Ny + j
-            count = 0
-            if i > 0:
-                count += 1
-            if i < Nx - 1:
-                count += 1
-            if j > 0:
-                count += 1
-            if j < Ny - 1:
-                count += 1
-            main_diag[idx] = count
-    A[np.arange(N), np.arange(N)] = main_diag
-
-    # Off-diagonals
-    # Horizontal neighbors
-    for i in range(Nx):
-        for j in range(Ny - 1):
-            idx = i * Ny + j
-            A[idx, idx + 1] = -1
-            A[idx + 1, idx] = -1
-    # Vertical neighbors
-    for i in range(Nx - 1):
-        for j in range(Ny):
-            idx = i * Ny + j
-            A[idx, idx + Ny] = -1
-            A[idx + Ny, idx] = -1
-
-    return A
-
-
-def genrate_random_b(A, seed=42, size=None):
-    if seed is not None:
-        np.random.seed(seed)
-    if size is None:
-        size = A.shape[0]
-    eigenvalues, eigenvectors = eigh(A)
-    coeffs = np.random.rand(len(eigenvalues))
-    b = eigenvectors @ (coeffs * eigenvalues)
-    b /= np.linalg.norm(b)
-    x = np.linalg.solve(A, b)
-
-    return b
 
 
 def generate_guaranteed_b(A, seed=42):
-    """Absolutely guaranteed to work for any non-zero matrix"""
+    """Absolutely guaranteed to work for any non-zero matrix
+"""
     np.random.seed(seed)
 
     # Method 1: Direct column space construction (most robust)
@@ -207,7 +157,7 @@ def generate_guaranteed_b(A, seed=42):
 def make_real_if_close(vec, tol=1e-8):
     """If imaginary parts are small compared to tol, return real part; otherwise
     return original.
-    """
+"""
     if np.max(np.abs(np.imag(vec))) < tol:
         return np.real(vec)
     return vec
@@ -221,7 +171,8 @@ def normalize(vec):
 
 
 def fidelity(u, v):
-    """Fidelity between two normalized states (complex)."""
+    """Fidelity between two normalized states (complex).
+"""
     u = normalize(u)
     v = normalize(v)
     return np.abs(np.vdot(u, v)) ** 2
@@ -234,7 +185,7 @@ def get_solution_from_results(results, num_system_qubits):
     'amplitude' (complex)
         num_system_qubits: int
         returns: amplitude vector (complex) normalized
-    """
+"""
     N = 2**num_system_qubits
     df = results.dataframe
 
@@ -266,7 +217,7 @@ def create_poisson_matrix_pauli(n_qubits):
     """
     Create 1D Poisson matrix and convert to Pauli decomposition
     This is the most reliable method
-    """
+"""
     import numpy as np
     from scipy.sparse import diags
 
@@ -288,6 +239,81 @@ def create_poisson_matrix_pauli(n_qubits):
 
     return pauli_operator, A_poisson
 
+def create_poisson_2d(nx, ny):
+    """Create 2D Poisson matrix for nx * ny grid using Kronecker products
+"""
+    # 1D Poisson matrix in x direction (size nx)
+    main_diag_x = 2.0 * np.ones(nx)
+    off_diag_x = -1.0 * np.ones(nx-1)
+    Ax = diags([off_diag_x, main_diag_x, off_diag_x], [-1, 0, 1], shape=(nx, nx))
+    
+    # 1D Poisson matrix in y direction (size ny)
+    main_diag_y = 2.0 * np.ones(ny)
+    off_diag_y = -1.0 * np.ones(ny-1)
+    Ay = diags([off_diag_y, main_diag_y, off_diag_y], [-1, 0, 1], shape=(ny, ny))
+    
+    # 2D Poisson matrix: A = Iy ⊗ Ax + Ay ⊗ Ix
+    Ix = eye(nx)
+    Iy = eye(ny)
+    
+    # Use sparse Kronecker product and convert to dense array
+    A = np.kron(Iy, Ax) + np.kron(Ay, Ix)
+    
+    return A
+
+def create_poisson_and_guaranteed_b():
+    """Create 2D Poisson matrix and guaranteed valid right-hand side vector b
+"""
+    N = 4
+
+    # 1D Poisson matrix in x direction (size N)
+    main_diag_x = 2.0 * np.ones(N)
+    off_diag_x = -1.0 * np.ones(N - 1)
+    Ax = diags([off_diag_x, main_diag_x, off_diag_x], [-1, 0, 1], shape=(N, N))
+
+    # 1D Poisson matrix in y direction (size N)
+    main_diag_y = 2.0 * np.ones(N)
+    off_diag_y = -1.0 * np.ones(N - 1)
+    Ay = diags([off_diag_y, main_diag_y, off_diag_y], [-1, 0, 1], shape=(N, N))
+
+    # 2D Poisson matrix: A = Iy ⊗ Ax + Ay ⊗ Ix
+    Ix = eye(N)
+    Iy = eye(N)
+    A = kron(Iy, Ax) + kron(Ay, Ix)
+    A = A.toarray().astype(np.float64)  # Convert to dense float array
+
+    # Generate guaranteed valid b
+    # Method 1: Try random vectors
+    for attempt in range(10):
+        x_random = np.random.randn(A.shape[1])
+        b = A @ x_random
+        if np.linalg.norm(b) > 1e-12:
+            b = b / np.linalg.norm(b)  # Normalize
+            return A, b
+    
+    # Method 2: If random fails, use SVD to find column space
+    try:
+        U, s, Vh = np.linalg.svd(A, full_matrices=False)
+        rank = np.sum(s > 1e-12)
+        if rank > 0:
+            coeffs = np.random.randn(rank)
+            b = U[:, :rank] @ coeffs
+            b = b / np.linalg.norm(b)
+            return A, b
+    except:
+        pass
+    
+    # Method 3: Use first non-zero column
+    for j in range(A.shape[1]):
+        b = A[:, j].copy()
+        if np.linalg.norm(b) > 1e-12:
+            b = b / np.linalg.norm(b)
+            return A, b
+    
+    # Final fallback: use ones vector (should work for Poisson)
+    b = np.ones(A.shape[0])
+    b = b / np.linalg.norm(b)
+    return A, b
 
 def create_preconditioned_poisson_system(
     n_qubits, preconditioner_type="incomplete_cholesky"
@@ -295,7 +321,7 @@ def create_preconditioned_poisson_system(
     N = 2**n_qubits
 
     # Create original system
-    p, A_original = create_poisson_matrix_pauli(n_qubits)
+    A_original = create_poisson_2d(N) 
     b_original = generate_guaranteed_b(A_original, seed=2)
 
     print("ORIGINAL SYSTEM:")
@@ -366,7 +392,7 @@ def create_preconditioned_poisson_system(
 def verify_linear_system(A, b, description="System", debug=False, error=1e-14):
     """
     Verify linear system solution and print diagnostics
-    """
+"""
     if debug:
         print(f"\n{'='*50}")
         print(f"VERIFICATION: {description}")
@@ -410,7 +436,7 @@ def test_ansatz_expressibility(
     """
     Standalone function to test ansatz expressibility
     Uses the same setup as your working VQLS optimizer
-    """
+"""
     # Normalize target solution
     target_solution = target_solution / np.linalg.norm(target_solution)
     
@@ -418,8 +444,10 @@ def test_ansatz_expressibility(
     backend_preferences = ClassiqBackendPreferences(backend_name="simulator_statevector")
     execution_preferences = ExecutionPreferences(num_shots=20480,backend_preferences=backend_preferences)
     
+    intermediate_costs = []
     def cost_function(params):
-        """Cost function: 1 - fidelity between ansatz output and target"""
+        """Cost function: 1 - fidelity between ansatz output and target
+"""
         
         @qfunc
         def main(io: Output[QNum[4]]):
@@ -444,12 +472,13 @@ def test_ansatz_expressibility(
         
         # Calculate infidelity
         fidelity = np.abs(np.vdot(target_solution, output_state))**2
+        intermediate_costs.append(1 - fidelity)
         return 1 - fidelity
     
     # Run optimization with same setup as your working optimizer
     random.seed(1000)
     initial_params = [
-        float(random.randint(-314, 314)) / 1000
+        float(np.random.randint(-314, 314)) / 1000
         for _ in range(param_count)
     ]
 
@@ -480,5 +509,15 @@ def test_ansatz_expressibility(
         print("⚠️  Ansatz is MARGINAL for this solution")
     else:
         print("❌ Ansatz is POOR for this solution")
+
+    plt.plot(
+        [l for l in range(len(intermediate_costs))],
+        intermediate_costs,
+    )
+    plt.title("VQLS Incomplete Choleski Precondition 4-Q Ansatz expressibility")
+    plt.xlabel("Iteration")
+    plt.ylabel("Cost")
+    plt.show()
+
     
     return best_fidelity, best_params

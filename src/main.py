@@ -20,14 +20,10 @@ from optimizer import VqlsOptimizer
 from vqls import Vqls
 from dotenv import load_dotenv
 from utils import (
-    create_poisson_matrix_pauli,
+    create_poisson_2d,
+    create_poisson_and_guaranteed_b,
     create_preconditioned_poisson_system,
-    generate_guaranteed_b,
-    laplacian_2d,
-    genrate_random_b,
-    normalize,
     test_ansatz_expressibility,
-    verify_linear_system,
 )
 
 # %%
@@ -36,16 +32,9 @@ load_dotenv()
 tk = os.environ["IBMQ_API_KEY"]
 
 backend_preferences = ClassiqBackendPreferences(backend_name="simulator_statevector")
-
 # %%
-# Base Poisson System
-N = 4
-p, A_base = create_poisson_matrix_pauli(N)
-b_base = generate_guaranteed_b(A_base, seed=2)
 
-x_classical, x_classical_normalized, error = verify_linear_system(
-    A_base, b_base, "Original Poisson System"
-)
+A, b = create_poisson_and_guaranteed_b()
 # %%
 n_qubits = 4  # 16x16 system
 preconditioner_type = "incomplete_cholesky"
@@ -68,7 +57,7 @@ target_solution_precond = x_precond / np.linalg.norm(x_precond)
 fidelity, best_params = test_ansatz_expressibility(
     target_solution_precond,
     ansatz_4_hardware,  
-    24, max_iterations=100
+    24, max_iterations=150
 
 )
 fidelity
