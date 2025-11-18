@@ -55,6 +55,7 @@ def ansatz_2_enhanced(
     RZ(angles[9], system_qubits[1])
     RY(angles[10], system_qubits[0])
     RY(angles[11], system_qubits[1])
+
 @qfunc
 def ansatz_2_efficient(angles: CArray[CReal], system_qubits: QArray[QBit]):
     """
