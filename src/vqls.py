@@ -1,5 +1,5 @@
 import os
-from classiq import ExecutionPreferences, allocate, qfunc
+from classiq import H, ExecutionPreferences, allocate, apply_to_all, qfunc
 from classiq.applications.chemistry import PauliOperator
 from classiq import IBMBackendPreferences
 
@@ -22,10 +22,15 @@ from classiq.applications.hamiltonian.pauli_decomposition import (
 from classiq.synthesis import synthesize
 import numpy as np
 
-from ansatz import apply_fixed_2_qubit_system_ansatz, apply_fixed_3_qubit_system_ansatz
+from ansatz import ansatz_2_efficient, ansatz_2_enhanced
 from block_encoding import block_encoding_vqls
 from optimizer import VqlsOptimizer
-from utils import plot_classical_vs_quantum, save_stats_to_json
+from utils import (
+    fidelity,
+    normalize,
+    plot_classical_vs_quantum,
+    save_stats_to_json,
+)
 
 DATA_DIR = "data/"
 
@@ -33,9 +38,8 @@ DATA_DIR = "data/"
 class Vqls:
     def __init__(self, ansatz_param_count, pauli_terms_structs, b, name):
         self.name = name
-        self.A = hamiltonian_to_matrix(pauli_terms_structs)
-        self.num_system_qubits = pauli_terms_structs.num_qubits
-        # self.num_system_qubits = len(pauli_terms_structs[0].pauli)
+        # self.num_system_qubits = pauli_terms_structs.num_qubits
+        self.num_system_qubits = 2
         print(self.num_system_qubits)
         self.num_ancila_qubits = (
             len(pauli_terms_structs.terms) - 1
@@ -47,6 +51,12 @@ class Vqls:
         b /= np.linalg.norm(b)
         self.b = b
         self.probs = (b**2) / np.sum(b**2)
+
+        if np.imag(self.probs).sum() > 0.01:
+            raise Exception("probabilities and not real")
+        else:
+            self.probs = np.real(self.probs)
+
         self.backend = None
 
     def create_qrog(self, qmod_file=False):
@@ -61,16 +71,12 @@ class Vqls:
             allocate(ancillary_qubits)
             allocate(system_qubits)
 
-            print("num_system_qubits:", self.num_system_qubits)
-            print("length of self.b:", len(self.b))
-            print("sum of probabilities:", np.sum(self.probs))
             block_encoding_vqls(
-                ansatz=lambda: apply_fixed_2_qubit_system_ansatz(
-                    params, system_qubits
-                ),
-                # ansatz=lambda: apply_fixed_3_qubit_system_ansatz(
+                # ansatz=lambda: apply_fixed_2_qubit_system_ansatz(
                 #     params, system_qubits
                 # ),
+                # ansatz=lambda: ansatz_2_enhanced(params, system_qubits),
+                ansatz=lambda: ansatz_2_efficient(params, system_qubits),
                 block_encoding=lambda: lcu_pauli(
                     operator=self.pauli_terms_structs,
                     data=system_qubits,
@@ -114,75 +120,18 @@ class Vqls:
             # apply_fixed_3_qubit_system_ansatz(
             #     list(optimal_params.values()), io
             # )
-            apply_fixed_2_qubit_system_ansatz(
-                list(optimal_params.values()), io
-            )
+            # apply_fixed_2_qubit_system_ansatz(
+
+            #     list(optimal_params.values()), io
+            #         )
+            # ansatz_2_enhanced(list(optimal_params.values()), io)
+            ansatz_2_efficient(list(optimal_params.values()), io)
+
+            # apply_improved_2_qubit_ansatz(
+            #     list(optimal_params.values()), io
+            # )
 
         qprog_3 = synthesize(main)
 
         with ExecutionSession(qprog_3, self.execution_preferences) as es:
             self.results = es.sample()
-
-    def compare_results(self):
-        N = 2**self.num_system_qubits
-
-        # --- 1) Get quantum amplitudes and probabilities ---
-        df = self.results.dataframe
-        amplitudes = np.zeros(N, dtype=complex)
-        amplitudes[df.io.values.astype(int)] = df.amplitude.values
-
-        # Remove global phase
-        global_phase = np.angle(amplitudes[-1])
-        amplitudes = np.real(amplitudes / np.exp(1j * global_phase))
-        if amplitudes[-1] < 0:
-            amplitudes *= -1
-
-        probabilities = amplitudes**2
-        self.quantum_probs = probabilities
-
-        # --- 2) Classical solution ---
-        A_num = self.A
-        # b = np.ones(N) / np.sqrt(N)  # uniform RHS
-        x = np.linalg.solve(A_num, self.b)
-        classical_probs = np.real((x / np.linalg.norm(x))) ** 2
-        self.classical_probs = classical_probs
-
-        b = self.b
-        # --- 3) Compute statistics ---
-        overlap = (
-            b.dot(
-                A_num.dot(amplitudes) / np.linalg.norm(A_num.dot(amplitudes))
-            )
-        ) ** 2
-        mse = np.mean((amplitudes - x / np.linalg.norm(x)) ** 2)
-        cosine_similarity = np.dot(probabilities, classical_probs) / (
-            np.linalg.norm(probabilities) * np.linalg.norm(classical_probs)
-        )
-
-        # Store stats in a dictionary
-        stats = {
-            "iterations": self.optimizer.count,
-            "Shots per iteration": self.num_shots,
-            "overlap": float(np.real(overlap)),
-            "mse": float(np.real(mse)),
-            "cosine_similarity": float(np.real(cosine_similarity)),
-            "classical_probs": classical_probs.tolist(),
-            "quantum_probs": probabilities.tolist(),
-        }
-
-        # Print metrics
-        print(f"Iterations = {stats['iterations']}")
-        print(f"Overlap = {stats['overlap']:.6f}")
-        print(f"MSE = {stats['mse']:.6e}")
-        print(f"Cosine similarity = {stats['cosine_similarity']:.6f}")
-        print(f"Classical probs = {classical_probs}")
-        print(f"Estimated probs = {probabilities.tolist()}")
-        print(f"Shots per iteration: {self.num_shots}")
-
-        # --- 4) Save stats to JSON ---
-        save_stats_to_json(stats, self.name, folder="data")
-
-        # --- 5) Plot ---
-        plot_classical_vs_quantum(classical_probs, probabilities, self.name)
-
-        return stats

@@ -1,4 +1,4 @@
-from classiq import CZ, RY, CArray, CReal, QArray, QBit, qfunc, repeat
+from classiq import CX, CZ, RY, RZ, U, CArray, CReal, QArray, QBit, qfunc, repeat
 
 
 @qfunc()
@@ -29,23 +29,49 @@ def apply_fixed_3_qubit_system_ansatz(
 
 
 @qfunc
-def apply_fixed_2_qubit_system_ansatz(angles: CArray[CReal], system_qubits: QArray[QBit]):
-    # angles should be length 6 (3 layers of RY for 2 qubits)
+def ansatz_2_enhanced(
+    angles: CArray[CReal], system_qubits: QArray[QBit]
+):
+    """
+    Enhanced 2-qubit ansatz with better expressivity
+    angles: length 12 for full expressivity
+    """
+    # Layer 1: Full single-qubit rotations
+    U(angles[0], angles[1], angles[2], 0, system_qubits[0])  # U3 gate
+    U(angles[3], angles[4], angles[5], 0, system_qubits[1])  # U3 gate
     
-    # Layer 1: RY on both qubits
-    RY(angles[0], system_qubits[0])
-    RY(angles[1], system_qubits[1])
+    # Entangling layer 1
+    CX(system_qubits[0], system_qubits[1])
     
-    # Entangling layer
-    CZ(system_qubits[0], system_qubits[1])
+    # Layer 2: Single-qubit rotations
+    RY(angles[6], system_qubits[0])
+    RY(angles[7], system_qubits[1])
     
-    # Layer 2: RY on both qubits
-    RY(angles[2], system_qubits[0])
-    RY(angles[3], system_qubits[1])
-    
-    # Entangling layer (optional: flip CZ direction)
+    # Entangling layer 2
     CZ(system_qubits[1], system_qubits[0])
     
-    # Layer 3: RY on both qubits
+    # Layer 3: Final rotations
+    RZ(angles[8], system_qubits[0])
+    RZ(angles[9], system_qubits[1])
+    RY(angles[10], system_qubits[0])
+    RY(angles[11], system_qubits[1])
+@qfunc
+def ansatz_2_efficient(angles: CArray[CReal], system_qubits: QArray[QBit]):
+    """
+    Efficient 2-qubit ansatz with 8 parameters
+    Still maintains good expressibility with reduced parameter space
+    """
+    # Layer 1: Single-qubit rotations (4 params)
+    RY(angles[0], system_qubits[0])
+    RY(angles[1], system_qubits[1])
+    RZ(angles[2], system_qubits[0])
+    RZ(angles[3], system_qubits[1])
+    
+    # Entangling layer (1 entangling gate)
+    CX(system_qubits[0], system_qubits[1])
+    
+    # Layer 2: Single-qubit rotations (4 params)
     RY(angles[4], system_qubits[0])
     RY(angles[5], system_qubits[1])
+    RZ(angles[6], system_qubits[0])
+    RZ(angles[7], system_qubits[1])
