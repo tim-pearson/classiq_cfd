@@ -1,9 +1,5 @@
-import os
-from classiq import H, ExecutionPreferences, allocate, apply_to_all, qfunc
-from classiq.applications.chemistry import PauliOperator
-from classiq import IBMBackendPreferences
+from classiq import  ExecutionPreferences, QBit, allocate, qfunc
 
-import matplotlib.pyplot as plt
 from classiq import (
     CArray,
     CReal,
@@ -13,44 +9,27 @@ from classiq import (
     allocate,
     lcu_pauli,
     qfunc,
-    write_qmod,
     inplace_prepare_state,
 )
-from classiq.applications.hamiltonian.pauli_decomposition import (
-    hamiltonian_to_matrix,
-)
+
+from classiq.qmod.qmod_variable import QArray
 from classiq.synthesis import synthesize
 import numpy as np
-from scipy.optimize import minimize
 
-from ansatz import ansatz_2_efficient, ansatz_2_enhanced
+from ansatz import ansatz_4_hardware
 from block_encoding import block_encoding_vqls
 from optimizer import VqlsOptimizer
-from utils import (
-    fidelity,
-    normalize,
-    plot_classical_vs_quantum,
-    save_stats_to_json,
-)
 
-DATA_DIR = "data/"
+
 
 
 class Vqls:
-    def __init__(self, ansatz_param_count, pauli_terms_structs, b, name):
-        self.name = name
-        # self.num_system_qubits = pauli_terms_structs.num_qubits
-        self.num_system_qubits = 2
-        print(self.num_system_qubits)
-        self.num_ancila_qubits = (
-            len(pauli_terms_structs.terms) - 1
-        ).bit_length()
-
-        print(self.num_ancila_qubits)
+    def __init__(self, ansatz_param_count, pauli_terms_structs, b, ansatz):
+        self.num_system_qubits = pauli_terms_structs.num_qubits
+        self.num_ancila_qubits = (len(pauli_terms_structs.terms) - 1).bit_length()
         self.ansatz_param_count = ansatz_param_count
+        self.ansatz = ansatz
         self.pauli_terms_structs = pauli_terms_structs
-        b /= np.linalg.norm(b)
-        self.b = b
         self.probs = (b**2) / np.sum(b**2)
 
         if np.imag(self.probs).sum() > 0.01:
@@ -73,11 +52,7 @@ class Vqls:
             allocate(system_qubits)
 
             block_encoding_vqls(
-                # ansatz=lambda: apply_fixed_2_qubit_system_ansatz(
-                #     params, system_qubits
-                # ),
-                # ansatz=lambda: ansatz_2_enhanced(params, system_qubits),
-                ansatz=lambda: ansatz_2_efficient(params, system_qubits),
+                ansatz=lambda: self.ansatz(params, system_qubits),
                 block_encoding=lambda: lcu_pauli(
                     operator=self.pauli_terms_structs,
                     data=system_qubits,
@@ -88,17 +63,9 @@ class Vqls:
                     bound=0.01,
                     target=system_qubits,
                 ),
-                # prepare_b_state=lambda: apply_to_all(H, system_qubits),
             )
 
         self.qprog_2 = synthesize(main, auto_show=False)
-        if qmod_file:
-            write_qmod(
-                main,
-                name="vqls_with_lcu",
-                decimal_precision=15,
-                symbolic_only=False,
-            )
 
     def init_optimizer(self, num_shots=204800, backend_preferences=None):
         self.execution_preferences = ExecutionPreferences(
@@ -118,23 +85,9 @@ class Vqls:
         @qfunc
         def main(io: Output[QNum[self.num_system_qubits]]):
             allocate(io)
-            # apply_fixed_3_qubit_system_ansatz(
-            #     list(optimal_params.values()), io
-            # )
-            # apply_fixed_2_qubit_system_ansatz(
-
-            #     list(optimal_params.values()), io
-            #         )
-            # ansatz_2_enhanced(list(optimal_params.values()), io)
-            ansatz_2_efficient(list(optimal_params.values()), io)
-
-            # apply_improved_2_qubit_ansatz(
-            #     list(optimal_params.values()), io
-            # )
+            self.ansatz(list(optimal_params.values()), io)
 
         qprog_3 = synthesize(main)
 
         with ExecutionSession(qprog_3, self.execution_preferences) as es:
             self.results = es.sample()
-
-    

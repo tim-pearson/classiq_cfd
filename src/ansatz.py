@@ -83,7 +83,7 @@ def ansatz_4_hardware(angles: CArray[CReal], qubits: QArray[QBit]):
     4-qubit hardware-efficient ansatz with linear entanglement
     24 parameters
     """
-    # Layer 1: Single-qubit rotations on all qubits
+    #Layer 1: Single-qubit rotations on all qubits
     for i in range(4):
         RY(angles[i], qubits[i])
     
@@ -106,3 +106,40 @@ def ansatz_4_hardware(angles: CArray[CReal], qubits: QArray[QBit]):
     for i in range(4):
         RY(angles[12 + i], qubits[i])
 
+@qfunc
+def ansatz_4_compact(angles: CArray[CReal, 8], qubits: QArray[QBit]):
+    """
+    Very compact 4-qubit ansatz - 8 parameters
+    Good for avoiding barren plateaus
+    """
+    # Layer 1: Single-qubit rotations
+    for i in range(4):
+        RY(angles[i], qubits[i])
+    
+    # Minimal entanglement
+    CX(qubits[0], qubits[1])
+    CX(qubits[2], qubits[3])
+    
+    # Layer 2: Final rotations
+    for i in range(4):
+        RY(angles[4 + i], qubits[i])
+
+@qfunc
+def ansatz_4_balanced(angles: CArray[CReal, 12], qubits: QArray[QBit]):
+    """
+    Balanced 4-qubit ansatz - 12 parameters
+    Good mix of expressibility and trainability
+    """
+    # Layer 1: RY rotations
+    for i in range(4):
+        RY(angles[i], qubits[i])
+    
+    # Linear entanglement
+    CX(qubits[0], qubits[1])
+    CX(qubits[1], qubits[2])
+    CX(qubits[2], qubits[3])
+    
+    # Layer 2: RY + RZ rotations
+    for i in range(4):
+        RY(angles[4 + i], qubits[i])
+        RZ(angles[8 + i], qubits[i])

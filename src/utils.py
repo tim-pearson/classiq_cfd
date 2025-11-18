@@ -261,10 +261,9 @@ def create_poisson_2d(nx, ny):
     
     return A
 
-def create_poisson_and_guaranteed_b():
+def create_poisson_and_guaranteed_b(N):
     """Create 2D Poisson matrix and guaranteed valid right-hand side vector b
 """
-    N = 4
 
     # 1D Poisson matrix in x direction (size N)
     main_diag_x = 2.0 * np.ones(N)
@@ -314,6 +313,16 @@ def create_poisson_and_guaranteed_b():
     b = np.ones(A.shape[0])
     b = b / np.linalg.norm(b)
     return A, b
+
+def incomplete_cholesky_pc(A, b, ptol):
+    L = np.tril(A)
+    M_inv = np.linalg.inv(L)
+    A_preconditioned = M_inv @ A @ M_inv.T  # Symmetric preconditioning
+    b_preconditioned = M_inv @ b
+
+    pauli_operator = matrix_to_pauli_operator(A_preconditioned, tol=ptol)
+    return A_preconditioned, b_preconditioned, M_inv, pauli_operator
+
 
 def create_preconditioned_poisson_system(
     n_qubits, preconditioner_type="incomplete_cholesky"

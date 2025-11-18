@@ -1,28 +1,15 @@
 import os
 
-from classiq.applications.hamiltonian.pauli_decomposition import (
-    hamiltonian_to_matrix,
-    matrix_to_hamiltonian,
-    pauli_operator_to_matrix,
-)
-import matplotlib.pyplot as plt
 from classiq import (
     ClassiqBackendPreferences,
-    IBMBackendPreferences,
-    Pauli,
-    SparsePauliOp,
 )
 import numpy as np
-from classiq import ClassiqBackendPreferences, ClassiqNvidiaBackendNames
-from pandas.io.formats.style import plt
-from ansatz import ansatz_4_hardware
-from optimizer import VqlsOptimizer
+from ansatz import ansatz_4_compact, ansatz_4_hardware
 from vqls import Vqls
 from dotenv import load_dotenv
 from utils import (
-    create_poisson_2d,
     create_poisson_and_guaranteed_b,
-    create_preconditioned_poisson_system,
+    incomplete_cholesky_pc,
     test_ansatz_expressibility,
 )
 
@@ -33,47 +20,35 @@ tk = os.environ["IBMQ_API_KEY"]
 
 backend_preferences = ClassiqBackendPreferences(backend_name="simulator_statevector")
 # %%
-
-A, b = create_poisson_and_guaranteed_b()
+N = 4
+A, b = create_poisson_and_guaranteed_b(N)
+A_pre, b_pre, M_inv, pauli = incomplete_cholesky_pc(A, b, 0.005)
+x_pre = np.linalg.solve(A_pre, b_pre)
+print("Vaild solution : ", np.allclose(b_pre, A_pre @ x_pre))
 # %%
-n_qubits = 4  # 16x16 system
-preconditioner_type = "incomplete_cholesky"
-max = -1
-max_i = 0
-(
-    pauli_operator,
-    A_precond,
-    M_inv,
-    A_original,
-    b_precond,
-    b_original,
-    improvement,
-    x_precond,
-) = create_preconditioned_poisson_system(n_qubits, preconditioner_type)
 
-# %%
-target_solution_precond = x_precond / np.linalg.norm(x_precond)
+# target_solution_precond = x_pre / np.linalg.norm(x_pre)
 
-fidelity, best_params = test_ansatz_expressibility(
-    target_solution_precond,
-    ansatz_4_hardware,  
-    24, max_iterations=150
+# fidelity, best_params = test_ansatz_expressibility(
+#     target_solution_precond,
+#     ansatz_4_hardware,  
+#     24, max_iterations=50
 
-)
-fidelity
+# )
+# fidelity
 # %%
 
 
 # Normalized versions for comparison
-x_classical_normalized = x_classical / np.linalg.norm(x_classical)
+x_classical_normalized = x_pre / np.linalg.norm(x_pre)
 
 
 # VQLS setup
 ansatz_param_count = 8
-num_system_qubits = p.num_qubits
-
+num_system_qubits = pauli.num_qubits
+len(pauli.terms)
 # %%
-vqls = Vqls(ansatz_param_count, p, b_base, "A")
+vqls = Vqls(ansatz_param_count, pauli, b_pre, ansatz_4_compact)
 
 print("Creating quantum program...")
 vqls.create_qrog()
@@ -88,55 +63,107 @@ print("Evaluating ansatz...")
 vqls.evaluate_ansatz(optimal_params)
 
 # Process results
+
+# %%
+# Process results
 df = vqls.results.dataframe
 amplitudes = np.zeros(2**num_system_qubits).astype(complex)
 amplitudes[df.io] = df.amplitude
+# %%
+quantum_state = amplitudes / np.linalg.norm(amplitudes)
+print(x_pre / np.linalg.norm(x_pre))
+# %%
+# CORRECTED: Normalize the quantum state (quantum states always have norm 1)
 
-# Phase correction
-global_phase = np.angle(amplitudes[-1])
-amplitudes = np.real(amplitudes / np.exp(1j * global_phase))
-if amplitudes[-1] < 0:
-    amplitudes *= -1
+# For VQLS, we want the solution to A|x⟩ ∝ |b⟩
+# So we need to compare A|x⟩ with b, not x with x_classical
 
-print(
-    "CLASSIQS Overlap",
-    (b_base.dot(A_base.dot(amplitudes) / (np.linalg.norm(A_base.dot(amplitudes)))))
-    ** 2,
-)
+# Calculate A|x_vqls⟩
+A_x_vqls = A_pre @ quantum_state
 
-print(f"VQLS amplitudes: {amplitudes}")
+# Normalize A|x_vqls⟩ to compare with normalized b
+A_x_vqls_normalized = A_x_vqls / np.linalg.norm(A_x_vqls)
+b_normalized = b_pre / np.linalg.norm(b_pre)
 
-# Normalize VQLS solution for comparison
-x_vqls_normalized = amplitudes / np.linalg.norm(amplitudes)
+# Calculate the actual VQLS cost function: ||A|x⟩ - |b⟩||²
+vqls_cost = np.linalg.norm(A_x_vqls_normalized - b_normalized)**2
 
+# Calculate overlap/fidelity between A|x⟩ and b
+overlap = np.abs(b_normalized @ A_x_vqls_normalized)**2
+
+overlap
+# %%
 print("\n" + "=" * 50)
-print("COMPARISON: VQLS vs Classical")
+print("CORRECTED VQLS PERFORMANCE")
 print("=" * 50)
+print(f"VQLS cost function: {vqls_cost:.6f}")
+print(f"Overlap |⟨b|A|x⟩|²: {overlap:.6f}")
+# print(f"Expected cost from optimizer: {optimal_params.fun:.6f}")
 
-print("Classical x (normalized):")
-print(np.array2string(x_classical_normalized, precision=4, suppress_small=True))
+# For comparison with classical solution, we need to find the scaling factor
+# Since A|x_vqls⟩ ∝ b, find the best scaling factor α that minimizes ||α·A|x_vqls⟩ - b||
+alpha = (b_pre @ A_x_vqls) / (A_x_vqls @ A_x_vqls)
+x_vqls_scaled = alpha * quantum_state
 
-print("\nVQLS x (normalized):")
-print(np.array2string(x_vqls_normalized, precision=4, suppress_small=True))
+print(f"\nBest scaling factor α: {alpha:.6f}")
 
-# Calculate metrics using NORMALIZED vectors
-error = np.linalg.norm(x_classical_normalized - x_vqls_normalized)
-overlap = np.abs(x_classical_normalized.dot(x_vqls_normalized)) ** 2
-
-print(f"\nL2 Error: {error:.4f}")
-print(f"Overlap (fidelity): {overlap:.4f}")
-
-# Check what VQLS actually achieved
-A_x_vqls = A_base.dot(amplitudes)
-A_x_vqls_norm = A_x_vqls / np.linalg.norm(A_x_vqls)
-actual_cost = np.linalg.norm(A_x_vqls_norm - b_base) ** 2
-
-print(f"\nVQLS achieved cost: {actual_cost:.6f}")
-print(f"b · (A|x_vqls⟩/||A|x_vqls⟩||): {np.abs(b_base.dot(A_x_vqls_norm)):.6f}")
-
+# Now compare with classical solution
 print("\n" + "=" * 50)
-print("VERIFICATION")
+print("SOLUTION COMPARISON")
 print("=" * 50)
-print(f"A @ x_classical: {A_base.dot(x_classical)}")
-print(f"b:               {b_base}")
-print(f"Match: {np.allclose(A_base.dot(x_classical), b_base, atol=1e-10)}")
+print("Classical solution x:")
+print(np.array2string(x_pre, precision=4, suppress_small=True))
+print("\nVQLS solution (scaled) x:")
+print(np.array2string(x_vqls_scaled, precision=4, suppress_small=True))
+
+# Calculate relative error
+relative_error = np.linalg.norm(x_vqls_scaled - x_pre) / np.linalg.norm(x_pre)
+print(f"\nRelative error: {relative_error:.6f}")
+
+# Verify both solutions satisfy the equation
+residual_classical = np.linalg.norm(A_pre @ x_pre - b_pre)
+residual_vqls = np.linalg.norm(A_pre @ x_vqls_scaled - b_pre)
+
+print(f"\nResidual ||A@x - b||:")
+print(f"Classical: {residual_classical:.6e}")
+print(f"VQLS:      {residual_vqls:.6e}")
+
+# Check if VQLS solution is proportional to classical solution
+cosine_similarity = np.abs(x_pre @ x_vqls_scaled) / (np.linalg.norm(x_pre) * np.linalg.norm(x_vqls_scaled))
+print(f"Cosine similarity between solutions: {cosine_similarity:.6f}")
+# %%
+# Instead of overlap between x vectors, measure what VQLS actually optimizes:
+
+def verify_vqls_success(amplitudes, A_pre, b_pre):
+    """Verify what VQLS actually achieved"""
+    quantum_state = amplitudes / np.linalg.norm(amplitudes)
+    A_x = A_pre @ quantum_state
+    
+    # What VQLS optimizes:
+    A_x_norm = A_x / np.linalg.norm(A_x)
+    b_norm = b_pre / np.linalg.norm(b_pre)
+    vqls_overlap = np.abs(b_norm @ A_x_norm)**2
+    vqls_cost = (1 - vqls_overlap) / 2
+    
+    print(f"VQLS metric - |⟨b|A|x⟩|²: {vqls_overlap:.4f}")
+    print(f"VQLS metric - cost: {vqls_cost:.4f}")
+    # print(f"Optimizer reported cost: {vqls.optimizer.intermediate.values(-1)}")
+    
+    # Now find the actual solution by scaling
+    alpha = (b_pre @ A_x) / (A_x @ A_x)
+    x_vqls_scaled = alpha * quantum_state
+    
+    # Compare with classical solution
+    classical_overlap = np.abs(x_pre @ x_vqls_scaled)**2 / (
+        np.linalg.norm(x_pre)**2 * np.linalg.norm(x_vqls_scaled)**2
+    )
+    print(f"Solution overlap |⟨x_classical|x_vqls⟩|²: {classical_overlap:.4f}")
+    print(
+        "overlap =",
+        (b.dot(A_pre.dot(amplitudes) / (np.linalg.norm(A_pre.dot(amplitudes))))) ** 2,
+    )
+    
+    return vqls_overlap, classical_overlap
+
+# Run it:
+vqls_overlap, classical_overlap = verify_vqls_success(amplitudes, A_pre, b_pre)
