@@ -21,6 +21,7 @@ from classiq.applications.hamiltonian.pauli_decomposition import (
 )
 from classiq.synthesis import synthesize
 import numpy as np
+from scipy.optimize import minimize
 
 from ansatz import ansatz_2_efficient, ansatz_2_enhanced
 from block_encoding import block_encoding_vqls
@@ -135,3 +136,5 @@ class Vqls:
 
         with ExecutionSession(qprog_3, self.execution_preferences) as es:
             self.results = es.sample()
+
+    

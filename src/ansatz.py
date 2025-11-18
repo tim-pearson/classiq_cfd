@@ -76,3 +76,33 @@ def ansatz_2_efficient(angles: CArray[CReal], system_qubits: QArray[QBit]):
     RY(angles[5], system_qubits[1])
     RZ(angles[6], system_qubits[0])
     RZ(angles[7], system_qubits[1])
+
+@qfunc
+def ansatz_4_hardware(angles: CArray[CReal], qubits: QArray[QBit]):
+    """
+    4-qubit hardware-efficient ansatz with linear entanglement
+    24 parameters
+    """
+    # Layer 1: Single-qubit rotations on all qubits
+    for i in range(4):
+        RY(angles[i], qubits[i])
+    
+    # Linear entanglement
+    CX(qubits[0], qubits[1])
+    CX(qubits[1], qubits[2]) 
+    CX(qubits[2], qubits[3])
+    
+    # Layer 2: Single-qubit rotations
+    for i in range(4):
+        RY(angles[4 + i], qubits[i])
+        RZ(angles[8 + i], qubits[i])
+    
+    # Reverse linear entanglement
+    CX(qubits[2], qubits[3])
+    CX(qubits[1], qubits[2])
+    CX(qubits[0], qubits[1])
+    
+    # Final layer
+    for i in range(4):
+        RY(angles[12 + i], qubits[i])
+
