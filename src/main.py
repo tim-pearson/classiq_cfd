@@ -4,7 +4,7 @@ from classiq import (
     ClassiqBackendPreferences,
 )
 import numpy as np
-from ansatz import ansatz_4_compact, ansatz_4_hardware
+from ansatz import ansatz_4_balanced, ansatz_4_compact, ansatz_4_hardware
 from vqls import Vqls
 from dotenv import load_dotenv
 from utils import (
@@ -22,7 +22,7 @@ backend_preferences = ClassiqBackendPreferences(backend_name="simulator_statevec
 # %%
 N = 4
 A, b = create_poisson_and_guaranteed_b(N)
-A_pre, b_pre, M_inv, pauli = incomplete_cholesky_pc(A, b, 0.005)
+A_pre, b_pre, M_inv, pauli = incomplete_cholesky_pc(A, b, 0.003)
 x_pre = np.linalg.solve(A_pre, b_pre)
 print("Vaild solution : ", np.allclose(b_pre, A_pre @ x_pre))
 # %%
@@ -31,13 +31,12 @@ print("Vaild solution : ", np.allclose(b_pre, A_pre @ x_pre))
 
 # fidelity, best_params = test_ansatz_expressibility(
 #     target_solution_precond,
-#     ansatz_4_hardware,  
-#     24, max_iterations=50
+#     ansatz_4_balanced,  
+#     12, max_iterations=100
 
 # )
 # fidelity
 # %%
-
 
 # Normalized versions for comparison
 x_classical_normalized = x_pre / np.linalg.norm(x_pre)

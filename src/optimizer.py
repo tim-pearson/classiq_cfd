@@ -26,48 +26,23 @@ class VqlsOptimizer:
         self.intermediate = {}
         self.count = 0
 
-    def get_hadamard_expectation(self, res):
+    def get_vqls_cost_residual(self, x_statevector):
         """
-        Compute expectation value from Hadamard test results
-        Returns ⟨Z_ancilla⟩ = P(ancilla=0) - P(ancilla=1)
-        This gives Re(⟨ψ|U|ψ⟩) or Im(⟨ψ|U|ψ⟩) depending on the circuit
-"""
-        ancilla_0_count = 0
-        ancilla_1_count = 0
-        total_shots = 0
-
-        for sample in res:
-            ancilla_state = sample.state[self.aux_var_name]
-            shots = sample.shots
-
-            if ancilla_state == 0:
-                ancilla_0_count += shots
-            elif ancilla_state == 1:
-                ancilla_1_count += shots
-            total_shots += shots
-
-        if total_shots == 0:
-            return 0.0
-
-        # ⟨Z⟩ = P(0) - P(1)
-        p0 = ancilla_0_count / total_shots
-        p1 = ancilla_1_count / total_shots
-        expectation = p0 - p1
-
-        return expectation
-
-
-    def get_vqls_cost(self, res):
-        expectation = self.get_hadamard_expectation(res)  # in [-1,1]
-        cost = (1.0 - expectation) / 2.0
-        return float(np.clip(cost, 0.0, 1.0))
+        Residual cost: ||A x(theta) - b||^2
+        """
+        Ax = self.A @ x_statevector
+        residual = Ax - self.b
+        return float(np.vdot(residual, residual).real)
 
     def my_cost(self, params):
+        # Run the quantum circuit and get the STATEVECTOR of x(theta)
         results = self.es.sample(params)
-        parsed = results.parsed_counts_of_outputs(
-            [self.ansatz_var_name, self.aux_var_name]
-        )
-        return self.get_vqls_cost(parsed)
+
+        # You MUST extract the ansatz output statevector
+        x_statevector = results.get_statevector(self.ansatz_var_name)
+
+        # Compute residual cost
+        return self.get_vqls_cost_residual(x_statevector)
 
     def f(self, x):
         cost = self.my_cost(
@@ -80,8 +55,7 @@ class VqlsOptimizer:
         random.seed(1000)
 
         initial_params = [
-            float(random.randint(-157, 157))
-            / 1000  # Range: -0.314 to 0.314 radians
+            float(random.randint(-157, 157)) / 1000  # Range: -0.314 to 0.314 radians
             for _ in range(self.ansatz_param_count)
         ]
 
@@ -89,7 +63,7 @@ class VqlsOptimizer:
 
         self._out = out = minimize(
             self.f,
-            x0=initial_params,  # Use the better initialization
+            x0=initial_params,
             method="COBYLA",
             options={"maxiter": 2000},
         )
