@@ -1,5 +1,8 @@
-from classiq import CX, CZ, RY, RZ, U, CArray, CReal, QArray, QBit, qfunc, repeat
-
+from classiq import CX, CZ, RY, RZ, U, CArray, CReal, ClassiqBackendPreferences, ExecutionPreferences, ExecutionSession, Output, QArray, QBit, QNum, allocate, qfunc, repeat
+import random
+from classiq.synthesis import synthesize
+import numpy as np
+from scipy.optimize import minimize
 
 @qfunc()
 def apply_ry_on_all(params: CArray[CReal], io: QArray[QBit]):
@@ -227,13 +230,13 @@ def test_ansatz_expressibility(
     else:
         print("❌ Ansatz is POOR for this solution")
 
-    plt.plot(
-        [l for l in range(len(intermediate_costs))],
-        intermediate_costs,
-    )
-    plt.title("VQLS Incomplete Choleski Precondition 4-Q Ansatz expressibility")
-    plt.xlabel("Iteration")
-    plt.ylabel("Cost")
-    plt.show()
+    # plt.plot(
+    #     [l for l in range(len(intermediate_costs))],
+    #     intermediate_costs,
+    # )
+    # plt.title("VQLS Incomplete Choleski Precondition 4-Q Ansatz expressibility")
+    # plt.xlabel("Iteration")
+    # plt.ylabel("Cost")
+    # plt.show()
 
     return best_fidelity, best_params
