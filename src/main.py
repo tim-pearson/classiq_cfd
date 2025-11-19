@@ -3,6 +3,7 @@ import os
 from classiq import (
     ClassiqBackendPreferences,
 )
+from classiq.applications.hamiltonian.pauli_decomposition import hamiltonian_to_matrix, matrix_to_pauli_operator
 import numpy as np
 from ansatz import ansatz_4_balanced, ansatz_4_compact, ansatz_4_hardware
 from vqls import Vqls
@@ -14,28 +15,26 @@ from utils import (
 )
 
 # %%
-
-load_dotenv()
-tk = os.environ["IBMQ_API_KEY"]
-
 backend_preferences = ClassiqBackendPreferences(backend_name="simulator_statevector")
 # %%
 N = 4
 A, b = create_poisson_and_guaranteed_b(N)
-A_pre, b_pre, M_inv, pauli = incomplete_cholesky_pc(A, b, 0.003)
+A_pre, b_pre, M_inv, pauli = incomplete_cholesky_pc(A, b, 1e-3)
+A_p = hamiltonian_to_matrix(pauli)
 x_pre = np.linalg.solve(A_pre, b_pre)
-print("Vaild solution : ", np.allclose(b_pre, A_pre @ x_pre))
+print(len(pauli.terms))
+
 # %%
 
-# target_solution_precond = x_pre / np.linalg.norm(x_pre)
+target_solution_precond = x_pre / np.linalg.norm(x_pre)
 
-# fidelity, best_params = test_ansatz_expressibility(
-#     target_solution_precond,
-#     ansatz_4_balanced,  
-#     12, max_iterations=100
+fidelity, best_params = test_ansatz_expressibility(
+    target_solution_precond,
+    ansatz_4_compact,  
+    8, max_iterations=100
 
-# )
-# fidelity
+)
+print("for solution x = ", target_solution_precond)
 # %%
 
 # Normalized versions for comparison
@@ -45,7 +44,6 @@ x_classical_normalized = x_pre / np.linalg.norm(x_pre)
 # VQLS setup
 ansatz_param_count = 8
 num_system_qubits = pauli.num_qubits
-len(pauli.terms)
 # %%
 vqls = Vqls(ansatz_param_count, pauli, b_pre, ansatz_4_compact)
 
@@ -72,22 +70,15 @@ amplitudes[df.io] = df.amplitude
 quantum_state = amplitudes / np.linalg.norm(amplitudes)
 print(x_pre / np.linalg.norm(x_pre))
 # %%
-# CORRECTED: Normalize the quantum state (quantum states always have norm 1)
 
-# For VQLS, we want the solution to A|x⟩ ∝ |b⟩
-# So we need to compare A|x⟩ with b, not x with x_classical
 
-# Calculate A|x_vqls⟩
 A_x_vqls = A_pre @ quantum_state
 
-# Normalize A|x_vqls⟩ to compare with normalized b
 A_x_vqls_normalized = A_x_vqls / np.linalg.norm(A_x_vqls)
 b_normalized = b_pre / np.linalg.norm(b_pre)
 
-# Calculate the actual VQLS cost function: ||A|x⟩ - |b⟩||²
 vqls_cost = np.linalg.norm(A_x_vqls_normalized - b_normalized)**2
 
-# Calculate overlap/fidelity between A|x⟩ and b
 overlap = np.abs(b_normalized @ A_x_vqls_normalized)**2
 
 overlap
@@ -166,3 +157,4 @@ def verify_vqls_success(amplitudes, A_pre, b_pre):
 
 # Run it:
 vqls_overlap, classical_overlap = verify_vqls_success(amplitudes, A_pre, b_pre)
+# %%

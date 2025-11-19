@@ -143,3 +143,97 @@ def ansatz_4_balanced(angles: CArray[CReal, 12], qubits: QArray[QBit]):
     for i in range(4):
         RY(angles[4 + i], qubits[i])
         RZ(angles[8 + i], qubits[i])
+
+
+def test_ansatz_expressibility(
+    target_solution, ansatz_func, param_count, max_iterations=100
+):
+    """
+    Standalone function to test ansatz expressibility
+    Uses the same setup as your working VQLS optimizer
+    """
+    # Normalize target solution
+    target_solution = target_solution / np.linalg.norm(target_solution)
+
+    # Use the same execution preferences as your working optimizer
+    backend_preferences = ClassiqBackendPreferences(
+        backend_name="simulator_statevector"
+    )
+    execution_preferences = ExecutionPreferences(
+        num_shots=20480, backend_preferences=backend_preferences
+    )
+
+    intermediate_costs = []
+
+    def cost_function(params):
+        """Cost function: 1 - fidelity between ansatz output and target"""
+
+        @qfunc
+        def main(io: Output[QNum[4]]):
+            allocate(io)
+            ansatz_func(list(params), io)
+
+        # Synthesize and run circuit
+        qprog = synthesize(main)
+        with ExecutionSession(qprog, execution_preferences=execution_preferences) as es:
+            results = es.sample()
+
+        # Reconstruct output statevector
+        df = results.dataframe
+        output_state = np.zeros(2**4).astype(complex)
+        output_state[df.io] = df.amplitude
+
+        # Normalize output state
+        output_state = output_state / np.linalg.norm(output_state)
+
+        # Calculate infidelity
+        fidelity = np.abs(np.vdot(target_solution, output_state)) ** 2
+        intermediate_costs.append(1 - fidelity)
+        return 1 - fidelity
+
+    # Run optimization with same setup as your working optimizer
+    random.seed(1000)
+    initial_params = [
+        float(np.random.randint(-314, 314)) / 1000 for _ in range(param_count)
+    ]
+
+    print(
+        f"Testing {ansatz_func.__name__} with {param_count} parameters on 4 qubits..."
+    )
+    print(f"Initial parameters: {initial_params}")
+
+    result = minimize(
+        cost_function,
+        x0=initial_params,
+        method="COBYLA",
+        options={"maxiter": max_iterations},
+    )
+
+    print(result)
+
+    best_fidelity = 1 - result.fun
+    best_params = result.x
+
+    print(f"Maximum achievable fidelity: {best_fidelity:.4f}")
+    print(f"Optimization success: {result.success}")
+
+    # Interpretation
+    if best_fidelity > 0.9:
+        print("✅ Ansatz is EXCELLENT for this solution")
+    elif best_fidelity > 0.7:
+        print("✅ Ansatz is GOOD for this solution")
+    elif best_fidelity > 0.5:
+        print("⚠️  Ansatz is MARGINAL for this solution")
+    else:
+        print("❌ Ansatz is POOR for this solution")
+
+    plt.plot(
+        [l for l in range(len(intermediate_costs))],
+        intermediate_costs,
+    )
+    plt.title("VQLS Incomplete Choleski Precondition 4-Q Ansatz expressibility")
+    plt.xlabel("Iteration")
+    plt.ylabel("Cost")
+    plt.show()
+
+    return best_fidelity, best_params
