@@ -1,13 +1,15 @@
 # %% [markdown]
 r"""
 
-# %% [markdown]"""
+# %% [markdown]
+"""
 
 # %% [markdown]
 r"""
 This tutorial covers an implementation example of a **Variational Quantum
 Linear Solver** [[1](#VQLS)] using block encoding. In particular, we use linear
-combinations of unitaries (LCUs) for the block encoding."""
+combinations of unitaries (LCUs) for the block encoding.
+"""
 
 # %% [markdown]
 r"""
@@ -65,10 +67,12 @@ We construct a quantum model as depicted in the figure below. When measuring
 the circuit in the computational basis, the probability of
 finding the system qubits in the ground state (given the ancillary qubits
 measured
-in their ground state) is"""
+in their ground state) is
+"""
 
 # %% [markdown]
-r""""""
+r"""
+"""
 
 # %%
 from typing import List
@@ -95,10 +99,12 @@ def block_encoding_vqls(
 
 # %% [markdown]
 r"""
-From here, we only need to define `ansatz`, `block_encoding`, and"""
+From here, we only need to define `ansatz`, `block_encoding`, and
+"""
 
 # %% [markdown]
-r""""""
+r"""
+"""
 
 # %% [markdown]
 r"""
@@ -106,7 +112,8 @@ r"""
 To variationally solve our linear problem, we define the
 cost function $C = 1- |\langle b | \Psi \rangle|^2$ that we are going to
 minimize. As explained above, we express it in terms of expectation
-values through Bayes\' theorem."""
+values through Bayes\' theorem.
+"""
 
 # %%
 import random
@@ -188,7 +195,8 @@ class VqlsOptimizer:
 r"""
 ***
 Once the optimal variational weights `w` are found, we
-can generate the quantum state $|x\rangle$. By measuring $|x\rangle$ in"""
+can generate the quantum state $|x\rangle$. By measuring $|x\rangle$ in
+"""
 
 # %% [markdown]
 r"""
@@ -196,7 +204,7 @@ r"""
 
 We treat a specific example based on a system of three qubits:
 
-$$
+$$\begin{aligned}
 \begin{align}
 A  &=  c_0 A_0 + c_1 A_1 + c_2 A_2 = \ 0.55 \mathbb{I} \ + \ 0.225 Z_1 \ + \
 0.225 Z_2
@@ -204,7 +212,6 @@ A  &=  c_0 A_0 + c_1 A_1 + c_2 A_2 = \ 0.55 \mathbb{I} \ + \ 0.225 Z_1 \ + \
 \\
 |b\rangle &= U_b |0 \rangle = H_0  H_1  H_2 |0\rangle,
 \end{align}
-$$
 """
 
 # %% [markdown]
@@ -213,7 +220,8 @@ To block encode the matrix A we use the LCU method. This can be done with the
 `lcu_paulis` library function. Note that this function can get a unnormalized
 Pauli operator, thus we calculate the normalization factor for the post-process
 analysis.
-The LCU quantum circuit looks as follows:"""
+The LCU quantum circuit looks as follows:
+"""
 
 # %%
 pauli_terms_structs = (
@@ -236,7 +244,8 @@ Let's consider our ansatz $V(w)$, such that
 $$|x\rangle = V(w) |0\rangle.$$
 
 
-This allows us to "search" the state space by varying a set of parameters, $w$. """
+This allows us to "search" the state space by varying a set of parameters, $w$.
+"""
 
 # %%
 @qfunc
@@ -265,10 +274,10 @@ def apply_fixed_3_qubit_system_ansatz(
     apply_ry_on_all([angles[6], angles[7], angles[8]], system_qubits)
 
 
-
+# %% [markdown]
+r"""
 
 # %%
-
 @qfunc
 def main(
     params: CArray[CReal, ansatz_param_count],
@@ -281,16 +290,19 @@ def main(
 qprog_1 = synthesize(main)
 show(qprog_1)
 
-# %% [markdown]"""
+# %% [markdown]
+"""
 
 # %% [markdown]
 r"""
 This is called a **fixed hardware ansatz** in that the configuration of quantum
 gates remains the same for each run of the circuit, and all that changes are
-the parameters. Unlike the QAOA ansatz, it is not composed solely of"""
+the parameters. Unlike the QAOA ansatz, it is not composed solely of
+"""
 
 # %% [markdown]
-r""""""
+r"""
+"""
 
 # %%
 @qfunc
@@ -316,15 +328,21 @@ def main(
     )
 
 
+# %% [markdown]
+r"""
+
 # %%
 qprog_2 = synthesize(main)
 show(qprog_2)
+"""
 
 # %%
 write_qmod(
     main, name="vqls_with_lcu", decimal_precision=15, symbolic_only=False
 )
 
+# %% [markdown]
+r"""
 
 # %%
 backend_preferences = ClassiqBackendPreferences(
@@ -342,6 +360,7 @@ optimizer = VqlsOptimizer(
     execution_preferences,
 )
 optimal_params = optimizer.optimize()
+"""
 
 # %%
 @qfunc
@@ -352,13 +371,16 @@ def main(io: Output[QNum[num_system_qubits]]):
 
 qprog_3 = synthesize(main)
 
+# %%
 with ExecutionSession(qprog_3, execution_preferences) as es:
     results = es.sample()
 
 df = results.dataframe
 
+# %%
 amplitudes = np.zeros(2**num_system_qubits).astype(complex)
 amplitudes[df.io] = df.amplitude
+# Preprocessed quantum solution: we know the solution is real, and that the last point is positive
 global_phase = np.angle(amplitudes[-1])
 amplitudes = np.real(amplitudes / np.exp(1j * global_phase))
 if (
@@ -367,23 +389,31 @@ if (
     amplitudes *= -1
 print(amplitudes)
 
+# %%
 probabilities = amplitudes**2
 
-# %%markdown]
+# %% [markdown]
 r"""
-### Comparing to the Classical Solution"""
+### Comparing to the Classical Solution
+"""
 
+# %% [markdown]
+r"""
+"""
 
 # %%
 A_num = hamiltonian_to_matrix(pauli_terms_structs) / normalization
 b = np.ones(8) / np.sqrt(8)
 
+# %% [markdown]
+r"""
 
 # %%
 A_inv = np.linalg.inv(A_num)
 x = np.dot(A_inv, b)
 classical_probs = np.real((x / np.linalg.norm(x))) ** 2
 classical_probs
+"""
 
 # %%
 print(
@@ -410,4 +440,5 @@ ax2.set_title("Quantum probabilities")
 plt.show()
 
 # %% [markdown]
-r""""""
+r"""
+"""

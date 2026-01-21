@@ -26,32 +26,59 @@ class VqlsOptimizer:
         self.intermediate = {}
         self.count = 0
 
-    def get_vqls_cost_residual(self, x_statevector):
-        """
-        Residual cost: ||A x(theta) - b||^2
-        """
-        Ax = self.A @ x_statevector
-        residual = Ax - self.b
-        return float(np.vdot(residual, residual).real)
+    def get_quantum_residual_vector(self, results):
+        counts = results.parsed_counts_of_outputs(
+            [self.ansatz_var_name, self.aux_var_name]
+        )
 
-    def my_cost(self, params):
-        # Run the quantum circuit and get the STATEVECTOR of x(theta)
+        # Success branch = ancilla = 0
+        total = 0
+        for s in counts:
+            if s.state[self.aux_var_name] == 0:
+                total += s.shots
+
+        vec = []
+        for basis in sorted(counts.states(self.ansatz_var_name)):
+            shots = 0
+            for s in counts:
+                if (
+                    s.state[self.aux_var_name] == 0
+                    and s.state[self.ansatz_var_name] == basis
+                ):
+                    shots += s.shots
+            vec.append(shots / total)
+
+        return np.array(vec)
+
+    def preconditioned_cost(self, params):
+        # 1. Run quantum sampling
         results = self.es.sample(params)
 
-        # You MUST extract the ansatz output statevector
-        x_statevector = results.get_statevector(self.ansatz_var_name)
+        # 2. Extract approximated Ax(θ)
+        Ax_vec = self.get_quantum_residual_vector(results)
 
-        # Compute residual cost
-        return self.get_vqls_cost_residual(x_statevector)
+        # 3. Compute classical residual r = A x - b
+        r = Ax_vec - self.b_vec      # b_vec must be given as np.array earlier
+
+        # 4. Apply classical preconditioner
+        pre_r = self.M_inv @ r
+
+        # 5. Norm squared
+        cost = float(pre_r.T @ pre_r)
+
+        return cost
 
     def f(self, x):
-        cost = self.my_cost(
-            {"params_" + str(k): x[k] for k in range(self.ansatz_param_count)}
-        )
+        # Convert optimizer parameters into dict for quantum execution
+        param_dict = {"params_" + str(k): x[k] for k in range(self.ansatz_param_count)}
+
+        cost = self.preconditioned_cost(param_dict)
+
         self.intermediate[tuple(x)] = cost
         return cost
 
-    def optimize(self):
+    def optimize(self, M_inv):
+        self.M_inv = M_inv
         random.seed(1000)
 
         initial_params = [

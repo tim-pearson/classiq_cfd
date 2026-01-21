@@ -15,6 +15,7 @@ def create_poisson_and_guaranteed_b(N):
     main_diag_y = 2.0 * np.ones(N)
     off_diag_y = -1.0 * np.ones(N - 1)
     Ay = diags([off_diag_y, main_diag_y, off_diag_y], [-1, 0, 1], shape=(N, N))
+    print("Ay = " , Ay)
 
     # 2D Poisson matrix: A = Iy ⊗ Ax + Ay ⊗ Ix
     Ix = eye(N)

@@ -21,16 +21,16 @@ N = 4
 A, b = create_poisson_and_guaranteed_b(N)
 A_pauli = matrix_to_pauli_operator(A, tol=1e-3)
 print(f"Original A Pauli terms: {len(A_pauli.terms)}")
-
+print(A_pauli.terms)
 A_pre, b_pre, M_inv, _ = incomplete_cholesky_pc(A, b, 1e-3)
 
 x_classical = np.linalg.solve(A, b)
 
 target_solution = x_classical / np.linalg.norm(x_classical)
 
-fidelity, best_params = test_ansatz_expressibility(
-    target_solution, ansatz_4_compact, 8, max_iterations=100
-)
+# fidelity, best_params = test_ansatz_expressibility(
+#     target_solution, ansatz_4_compact, 8, max_iterations=100
+# )
 # %%
 
 ansatz_param_count = 8
