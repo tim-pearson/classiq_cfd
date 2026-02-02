@@ -1,143 +1,160 @@
-# %%
-from typing import Tuple
-from classiq import RY, X, CArray, CInt, CReal, Output, QArray, QBit, QNum, allocate, control, qfunc, repeat
-from classiq.synthesis import synthesize
-import numpy as np
 
-
-# %%
-# 1. Create 1D Poisson matrix
-def poisson_1d_matrix(N):
-    A = 2*np.eye(N)
-    for i in range(N-1):
-        A[i, i+1] = -1
-        A[i+1, i] = -1
-    return A
-
-N = 4
-A = poisson_1d_matrix(N)
-print("Original A:\n", A)
-
-# %%
-# 2. HED decomposition
-def hed_decomposition(A):
-    N = A.shape[0]
-    L0 = np.eye(N)
-    L1 = np.zeros((N, N))
-    for i in range(N-1):
-        L1[i,i+1] = -1
-        L1[i+1,i] = -1
-    L_matrices = [L0, L1]
-
-    # Solve least squares for alpha
-    A_vec = A.flatten()
-    L_vecs = np.stack([L.flatten() for L in L_matrices], axis=1)
-    alpha, _, _, _ = np.linalg.lstsq(L_vecs, A_vec, rcond=None)
-    return alpha, L_matrices
-
-def build_A_from_hed(alpha, L_matrices):
-    result = np.zeros_like(A)
-    for a, L in zip(alpha, L_matrices):
-        result += a * L
-    return result
-
-alpha, L_matrices = hed_decomposition(A)
-print("HED coefficients:", alpha)
-print(f"Verify A = A_hed : ",np.allclose(A, build_A_from_hed(alpha, L_matrices)))
-
-# %%
-# 3. Prepare test state |psi>
-psi = np.random.rand(N)
-psi = psi / np.linalg.norm(psi)
-print("Test state |psi>:", psi)
-
-# Classical application for verification
-def apply_hed_classical(alpha, L_matrices, psi):
-    result = np.zeros_like(psi)
-    for a, L in zip(alpha, L_matrices):
-        result += a * (L @ psi)
-    return result
-
-result_classical = apply_hed_classical(alpha, L_matrices, psi)
-print("Classical HED A|psi>:", result_classical)
-
-# %%
-# 4. Convert |psi> to angles for single-qubit rotations (toy for demo)
-def state_to_angles(psi):
-    # For N=2^n, we approximate with single-qubit RY rotations
-    return [2*np.arcsin(np.sqrt(p)) for p in psi**2]
-
-angles = state_to_angles(psi)
-print("Rotation angles for |psi>:", angles)
-
-# %%
-import numpy as np
 from classiq import *
+import numpy as np
+# %%
+import numpy as np
 
-# Define N
-N = 4
+# For N=4 grid points, we need n=2 qubits (2^2=4 states)
+N = 4  # Grid points
+n = 2  # Qubits needed
+dim = N  # Should be 4, NOT 16
 
-# 5. Define shallow L_i circuits as qfuncs
+# Classical Poisson matrix (4x4)
+A_classical = np.array([
+    [2, -1, 0, 0],
+    [-1, 2, -1, 0],
+    [0, -1, 2, -1],
+    [0, 0, -1, 2]
+])
 
-@qfunc
-def prepare_psi_state(system_qubits: QArray[QBit]):
-    # Prepare |psi> - example probabilities
-    psi = [0.25, 0.25, 0.25, 0.25]
-    rotation_angles = [2*np.arcsin(np.sqrt(p)) for p in psi]
-    
-    # Apply RY to each qubit
-    for i in range(N):
-        RY(rotation_angles[i], system_qubits[i])
-# Main function
+# Now define L1, L2, L3 as 4x4 matrices matching the paper
 
+# L1 = I ⊗ X (for n=2 qubits)
+# This flips the LSB (qubit 0)
+L1 = np.array([
+    [0, 1, 0, 0],
+    [1, 0, 0, 0],
+    [0, 0, 0, 1],
+    [0, 0, 1, 0]
+])
 
-ANCILLA_SIZE = 2  # Fixed number of ancilla qubits
-@qfunc
-def prepare_psi_state(system_qubits: QArray[QBit]):
-    psi = [0.25]*system_qubits.len
-    rotation_angles = [2*np.arcsin(np.sqrt(p)) for p in psi]
-    for i in range(system_qubits.len):
-        RY(rotation_angles[i], system_qubits[i])
+# L2 from paper pattern for n=2
+# Based on equation (11): [1,0,1,1,0] pattern
+L2 = np.array([
+    [1, 0, 0, 0],
+    [0, 0, 1, 0],
+    [0, 1, 0, 0],
+    [0, 0, 0, 1]
+])
 
+# L3 = diagonal with alternating signs based on parity
+L3 = np.array([
+    [-1, 0, 0, 0],
+    [0, 1, 0, 0],
+    [0, 0, 1, 0],
+    [0, 0, 0, -1]
+])
 
+Id = np.eye(4)
+alpha = [2.5, -1, -1, -0.5]
+A_hed = alpha[0]*Id + alpha[1]*L1 + alpha[2]*L2 + alpha[3]*L3
 
+print("A_classical (4x4):")
+print(A_classical)
+print("\nA_hed (4x4):")
+print(A_hed)
+print(f"\nClose? {np.allclose(A_classical, A_hed)}")
+print(f"\nMax difference: {np.max(np.abs(A_classical - A_hed))}")
 # %%
 
 @qfunc
 def L1_circuit(system_qubits: QArray[QBit]):
-    X(system_qubits[3])
+    X(system_qubits[0])
+
+@qfunc
+def C1_circuit(system_qubits: QArray[QBit]):
+    control(ctrl=system_qubits[0], stmt_block=lambda: X(system_qubits[1]))
+    control(ctrl=system_qubits[0], stmt_block=lambda: X(system_qubits[1]))
+    control(ctrl=system_qubits[0], stmt_block=lambda: X(system_qubits[1]))
+
+@qfunc
+def C2_circuit(system_qubits: QArray[QBit]):
+    control(ctrl=system_qubits[0], stmt_block=lambda: X(system_qubits[2]))
+    control(ctrl=system_qubits[1], stmt_block=lambda: X(system_qubits[2]))
+    control(ctrl=system_qubits[0:2], stmt_block=lambda: X(system_qubits[2]))
+    control(ctrl=system_qubits[1], stmt_block=lambda: X(system_qubits[2]))
+    control(ctrl=system_qubits[0], stmt_block=lambda: X(system_qubits[2]))
+
+@qfunc
+def C3_circuit(system_qubits: QArray[QBit]):
+    control(ctrl=system_qubits[0], stmt_block=lambda: X(system_qubits[3]))
+    control(ctrl=system_qubits[1], stmt_block=lambda: X(system_qubits[3]))
+    control(ctrl=system_qubits[2], stmt_block=lambda: X(system_qubits[3]))
+    control(ctrl=system_qubits[0:3], stmt_block=lambda: X(system_qubits[3]))
+    control(ctrl=system_qubits[2], stmt_block=lambda: X(system_qubits[3]))
+    control(ctrl=system_qubits[1], stmt_block=lambda: X(system_qubits[3]))
+    control(ctrl=system_qubits[0], stmt_block=lambda: X(system_qubits[3]))
 
 @qfunc
 def L2_circuit(system_qubits: QArray[QBit]):
-    n = system_qubits.len
-    for i in range(1, n):
-        controls = system_qubits[:i]
-        target = system_qubits[i]
-        control(ctrl=controls, stmt_block=lambda t=target: X(t))
+    C1_circuit(system_qubits)
+    C2_circuit(system_qubits)
+    C3_circuit(system_qubits)
 
 @qfunc
 def L3_circuit(system_qubits: QArray[QBit]):
-    target = system_qubits[3]
-    control(ctrl=[system_qubits[0], system_qubits[1], system_qubits[2]], stmt_block=lambda: Z(target))
-    control(ctrl=[system_qubits[0], system_qubits[1], system_qubits[2]], stmt_block=lambda: X(target))
+    target = system_qubits[0]
+    H(target)
+    if system_qubits.len > 1:
+        control(ctrl=system_qubits[1:], stmt_block=lambda: X(target))
+    H(target)
+    X(target)
+    H(target)
+    if system_qubits.len > 1:
+        control(ctrl=system_qubits[1:], stmt_block=lambda: X(target))
+    H(target)
+    X(target)
+
+@qfunc
+def prepare_hed_ancilla(ancilla_qubits: QArray[QBit]):
+    alpha = [2.5, -1.0, -1.0, -0.5]
+    alpha_mag = [abs(a) for a in alpha]
+    total = sum(alpha_mag)
+    probabilities = [a/total for a in alpha_mag]
+    
+    theta0 = 2 * np.arccos(np.sqrt(probabilities[0] + probabilities[1]))
+    theta1 = 2 * np.arccos(np.sqrt(probabilities[0] / (probabilities[0] + probabilities[1]))) if probabilities[0] + probabilities[1] > 0 else 0
+    theta2 = 2 * np.arccos(np.sqrt(probabilities[2] / (probabilities[2] + probabilities[3]))) if probabilities[2] + probabilities[3] > 0 else 0
+    
+    RY(theta0, ancilla_qubits[0])
+    
+    control(ctrl=ancilla_qubits[0], stmt_block=lambda: RY(theta1, ancilla_qubits[1]))
+    X(ancilla_qubits[0])
+    control(ctrl=ancilla_qubits[0], stmt_block=lambda: RY(theta2, ancilla_qubits[1]))
+    X(ancilla_qubits[0])
+
+@qfunc
+def hed_linear_combination(system_qubits: QArray[QBit], ancilla_qubits: QArray[QBit]):
+    prepare_hed_ancilla(ancilla_qubits)
+    
+    control(ctrl=[ancilla_qubits[0], ancilla_qubits[1]], stmt_block=lambda: L1_circuit(system_qubits))
+    
+    X(ancilla_qubits[1])
+    control(ctrl=[ancilla_qubits[0], ancilla_qubits[1]], stmt_block=lambda: L2_circuit(system_qubits))
+    X(ancilla_qubits[1])
+    
+    X(ancilla_qubits[0])
+    control(ctrl=[ancilla_qubits[0], ancilla_qubits[1]], stmt_block=lambda: L3_circuit(system_qubits))
+    X(ancilla_qubits[0])
+
+
+@qfunc
+def prepare_test_state(system_qubits: QArray[QBit]):
+    for i in range(system_qubits.len):
+        H(system_qubits[i])
 
 @qfunc
 def main(system_out: Output[QArray[QBit]], ancilla_out: Output[QArray[QBit]]):
-    allocate(3, ancilla_out)
-    allocate(4, system_out)
-    prepare_psi_state(system_out)
-    control(ctrl=ancilla_out[0], stmt_block=lambda: L1_circuit(system_out))
-    control(ctrl=ancilla_out[1], stmt_block=lambda: L2_circuit(system_out))
-    control(ctrl=ancilla_out[2], stmt_block=lambda: L3_circuit(system_out))
+    allocate(2, ancilla_out)
+    allocate(n, system_out)
+    prepare_test_state(system_out)
+    hed_linear_combination(system_out, ancilla_out)
 
-qprog = synthesize(main, auto_show=False)
-print("Quantum HED circuit synthesized!")
+qprog = synthesize(main)
 
 
 # %%
-
 results =None
-sv =None
 backend_preferences = ClassiqBackendPreferences(backend_name="simulator_statevector")
 execution_preferences = ExecutionPreferences(
             num_shots=1000, backend_preferences=backend_preferences
@@ -148,18 +165,21 @@ with ExecutionSession(qprog, execution_preferences) as es:
 print(results)
 # %%
 
-# %%
-def extract_postselected_system_state(results, ancilla_bits=3, system_bits=4):
+# Verification functions
+def extract_postselected_system_state(results, ancilla_bits=2, system_bits=n):
+    """Extract system state when ancilla=|00⟩"""
     parsed = results.parsed_state_vector_states
     postselected_state = np.zeros(2**system_bits, dtype=complex)
+    
     for full_state, amp in results.state_vector.items():
         ancilla_state = full_state[:ancilla_bits]
-        system_state = full_state[ancilla_bits:]
-
-        system_bits_str = full_state[-system_bits:]  # last system_bits bits
-        if set(ancilla_state) == {'0'}:
-            idx = int(system_bits_str, 2)
+        system_state_str = full_state[ancilla_bits:ancilla_bits+system_bits]
+        
+        # Post-select on ancilla=|00⟩
+        if ancilla_state == '00':
+            idx = int(system_state_str, 2)
             postselected_state[idx] = amp
+    
     # Normalize
     norm = np.linalg.norm(postselected_state)
     if norm > 0:
@@ -167,30 +187,31 @@ def extract_postselected_system_state(results, ancilla_bits=3, system_bits=4):
     return postselected_state
 
 # %%
-def classical_HED_apply(alpha, L_matrices, psi):
-    result = np.zeros_like(psi)
-    for a, L in zip(alpha, L_matrices):
-        result += a * (L @ psi)
-    return result / np.linalg.norm(result)
+# Create classical reference
+N = 16
+A = poisson_1d_matrix(N)
+psi = np.array([0.25]*N)  # Uniform state matching quantum circuit
+psi = psi / np.linalg.norm(psi)
+classical_state = A @ psi
+classical_state = classical_state / np.linalg.norm(classical_state)
 
-# %%
-def postselect_and_compare(results, alpha, L_matrices, psi):
-    system_state_post = extract_postselected_system_state(results)
-    classical_state = classical_HED_apply(alpha, L_matrices, psi)
-    
-    # Pad classical state if necessary
-    if len(system_state_post) != len(classical_state):
-        classical_state = np.pad(classical_state, (0, len(system_state_post) - len(classical_state)))
-    
-    rel_error = np.linalg.norm(classical_state - system_state_post)
-    cos_sim = np.abs(np.vdot(classical_state, system_state_post))
-    
-    print("Post-selected system state amplitudes:\n", system_state_post)
-    print("-"*65)
-    print(f"Relative error: {rel_error:.6f}, Cosine similarity: {cos_sim:.6f}")
-    return system_state_post, classical_state, rel_error, cos_sim
+# Get quantum result
+system_state_post = extract_postselected_system_state(results)
 
+# Compare
+rel_error = np.linalg.norm(classical_state - system_state_post)
+cos_sim = np.abs(np.vdot(classical_state, system_state_post))
 
-system_state_post, classical_state, rel_error, cos_sim = postselect_and_compare(
-    results, alpha, L_matrices, psi
-)
+print("Post-selected quantum state (first 8 amplitudes):")
+for i in range(min(8, len(system_state_post))):
+    print(f"  |{format(i, f'0{n}b')}⟩: {system_state_post[i]:.6f}")
+
+print("\nClassical state (first 8 amplitudes):")
+for i in range(min(8, len(classical_state))):
+    print(f"  |{format(i, f'0{n}b')}⟩: {classical_state[i]:.6f}")
+
+print(f"\nComparison Results:")
+print(f"Relative error: {rel_error:.6f}")
+print(f"Cosine similarity: {cos_sim:.6f}")
+print(f"Quantum state norm: {np.linalg.norm(system_state_post):.6f}")
+print(f"Classical state norm: {np.linalg.norm(classical_state):.6f}")
