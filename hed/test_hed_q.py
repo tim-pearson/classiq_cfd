@@ -1,4 +1,5 @@
 # %%
+from typing import Tuple
 from classiq import RY, X, CArray, CInt, CReal, Output, QArray, QBit, QNum, allocate, control, qfunc, repeat
 from classiq.synthesis import synthesize
 import numpy as np
@@ -77,27 +78,6 @@ from classiq import *
 N = 4
 
 # 5. Define shallow L_i circuits as qfuncs
-@qfunc
-def L0_circuit(system_qubits: QArray[QBit]):
-    # Identity (does nothing)
-    pass
-
-@qfunc
-def L1_circuit(system_qubits: QArray[QBit]):
-    # Apply simple X gates between neighbors to mimic off-diagonal
-    for i in range(N-1):
-        X(system_qubits[i])
-        X(system_qubits[i+1])
-
-# Function to prepare |psi> state
-# Alternative: if you know the size at compile time
-@qfunc
-def apply_ry_on_all_fixed(params: CArray[CReal], io: QArray[QBit]):
-    # Manually apply to each qubit (if you know N=4)
-    RY(params[0], io[0])
-    RY(params[1], io[1])
-    RY(params[2], io[2])
-    RY(params[3], io[3])
 
 @qfunc
 def prepare_psi_state(system_qubits: QArray[QBit]):
@@ -112,25 +92,105 @@ def prepare_psi_state(system_qubits: QArray[QBit]):
 
 
 ANCILLA_SIZE = 2  # Fixed number of ancilla qubits
+@qfunc
+def prepare_psi_state(system_qubits: QArray[QBit]):
+    psi = [0.25]*system_qubits.len
+    rotation_angles = [2*np.arcsin(np.sqrt(p)) for p in psi]
+    for i in range(system_qubits.len):
+        RY(rotation_angles[i], system_qubits[i])
 
-# OR with Output type annotations:
+
+
+# %%
+
+@qfunc
+def L1_circuit(system_qubits: QArray[QBit]):
+    X(system_qubits[3])
+
+@qfunc
+def L2_circuit(system_qubits: QArray[QBit]):
+    n = system_qubits.len
+    for i in range(1, n):
+        controls = system_qubits[:i]
+        target = system_qubits[i]
+        control(ctrl=controls, stmt_block=lambda t=target: X(t))
+
+@qfunc
+def L3_circuit(system_qubits: QArray[QBit]):
+    target = system_qubits[3]
+    control(ctrl=[system_qubits[0], system_qubits[1], system_qubits[2]], stmt_block=lambda: Z(target))
+    control(ctrl=[system_qubits[0], system_qubits[1], system_qubits[2]], stmt_block=lambda: X(target))
+
 @qfunc
 def main(system_out: Output[QArray[QBit]], ancilla_out: Output[QArray[QBit]]):
-    allocate(ANCILLA_SIZE, ancilla_out)
-    allocate(N, system_out)
-    
+    allocate(3, ancilla_out)
+    allocate(4, system_out)
     prepare_psi_state(system_out)
-    control(ancilla_out[0], lambda: L1_circuit(system_out))
-# Create the quantum model
-# Synthesize (simulate) the quantum circuit
+    control(ctrl=ancilla_out[0], stmt_block=lambda: L1_circuit(system_out))
+    control(ctrl=ancilla_out[1], stmt_block=lambda: L2_circuit(system_out))
+    control(ctrl=ancilla_out[2], stmt_block=lambda: L3_circuit(system_out))
+
 qprog = synthesize(main, auto_show=False)
 print("Quantum HED circuit synthesized!")
 
+
 # %%
-# 7. Verification (classical simulation of output)
-# In practice, here we would measure and compute expectation values <psi|L_i|psi>
-# For demonstration, we just check the classical reconstruction matches A@psi
-print("\nComparison classical vs original A@psi:")
-print("Original A@psi:", A @ psi)
-print("HED reconstruction:", result_classical)
-print("Frobenius error:", np.linalg.norm(A @ psi - result_classical))
+
+results =None
+sv =None
+backend_preferences = ClassiqBackendPreferences(backend_name="simulator_statevector")
+execution_preferences = ExecutionPreferences(
+            num_shots=1000, backend_preferences=backend_preferences
+        )
+
+with ExecutionSession(qprog, execution_preferences) as es:
+            results = es.sample()
+print(results)
+# %%
+
+# %%
+def extract_postselected_system_state(results, ancilla_bits=3, system_bits=4):
+    parsed = results.parsed_state_vector_states
+    postselected_state = np.zeros(2**system_bits, dtype=complex)
+    for full_state, amp in results.state_vector.items():
+        ancilla_state = full_state[:ancilla_bits]
+        system_state = full_state[ancilla_bits:]
+
+        system_bits_str = full_state[-system_bits:]  # last system_bits bits
+        if set(ancilla_state) == {'0'}:
+            idx = int(system_bits_str, 2)
+            postselected_state[idx] = amp
+    # Normalize
+    norm = np.linalg.norm(postselected_state)
+    if norm > 0:
+        postselected_state /= norm
+    return postselected_state
+
+# %%
+def classical_HED_apply(alpha, L_matrices, psi):
+    result = np.zeros_like(psi)
+    for a, L in zip(alpha, L_matrices):
+        result += a * (L @ psi)
+    return result / np.linalg.norm(result)
+
+# %%
+def postselect_and_compare(results, alpha, L_matrices, psi):
+    system_state_post = extract_postselected_system_state(results)
+    classical_state = classical_HED_apply(alpha, L_matrices, psi)
+    
+    # Pad classical state if necessary
+    if len(system_state_post) != len(classical_state):
+        classical_state = np.pad(classical_state, (0, len(system_state_post) - len(classical_state)))
+    
+    rel_error = np.linalg.norm(classical_state - system_state_post)
+    cos_sim = np.abs(np.vdot(classical_state, system_state_post))
+    
+    print("Post-selected system state amplitudes:\n", system_state_post)
+    print("-"*65)
+    print(f"Relative error: {rel_error:.6f}, Cosine similarity: {cos_sim:.6f}")
+    return system_state_post, classical_state, rel_error, cos_sim
+
+
+system_state_post, classical_state, rel_error, cos_sim = postselect_and_compare(
+    results, alpha, L_matrices, psi
+)
