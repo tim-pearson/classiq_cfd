@@ -99,31 +99,28 @@ def apply_ry_on_all_fixed(params: CArray[CReal], io: QArray[QBit]):
     RY(params[2], io[2])
     RY(params[3], io[3])
 
-# Main function
 @qfunc
-def main(ancilla_size: CInt, system_size: CInt):
-    ancilla_qubits = QArray("ancilla_qubits")
-    system_qubits = QArray("system_qubits")
-    
-    allocate(ancilla_size, ancilla_qubits)
-    allocate(system_size, system_qubits)
-
-    # Prepare test state |psi> - example probabilities
-    # Note: system_size should equal len(psi) = N = 4
+def prepare_psi_state(system_qubits: QArray[QBit]):
+    # Prepare |psi> - example probabilities
     psi = [0.25, 0.25, 0.25, 0.25]
     rotation_angles = [2*np.arcsin(np.sqrt(p)) for p in psi]
     
-    # Use the repeat version
-    apply_ry_on_all_fixed(rotation_angles, system_qubits)
+    # Apply RY to each qubit
+    for i in range(N):
+        RY(rotation_angles[i], system_qubits[i])
+# Main function
 
-    # Apply L1 controlled on ancilla[0] being |1⟩
-    control(ancilla_qubits[0], lambda: L1_circuit(system_qubits))
+
+ANCILLA_SIZE = 2  # Fixed number of ancilla qubits
+
+# OR with Output type annotations:
+@qfunc
+def main(system_out: Output[QArray[QBit]], ancilla_out: Output[QArray[QBit]]):
+    allocate(ANCILLA_SIZE, ancilla_out)
+    allocate(N, system_out)
     
-    # If you need zero-controlled (when ancilla is |0⟩), add X gates
-    # X(ancilla_qubits[0])
-    # control(ancilla_qubits[0], lambda: L1_circuit(system_qubits))
-    # X(ancilla_qubits[0])
-
+    prepare_psi_state(system_out)
+    control(ancilla_out[0], lambda: L1_circuit(system_out))
 # Create the quantum model
 # Synthesize (simulate) the quantum circuit
 qprog = synthesize(main, auto_show=False)
