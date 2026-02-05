@@ -1,5 +1,5 @@
 import os
-from classiq import H, ExecutionPreferences, allocate, apply_to_all, qfunc
+from classiq import H, I, ExecutionPreferences, allocate, apply_to_all, qfunc
 from classiq.applications.chemistry import PauliOperator
 from classiq import IBMBackendPreferences
 
@@ -22,7 +22,7 @@ from classiq.applications.hamiltonian.pauli_decomposition import (
 from classiq.synthesis import synthesize
 import numpy as np
 
-from ansatz import ansatz_2_efficient, ansatz_2_enhanced
+from ansatz import ansatz_2_efficient, ansatz_2_enhanced, apply_vqls_2_qubit_pauli_ansatz
 from block_encoding import block_encoding_vqls
 from optimizer import VqlsOptimizer
 from utils import (
@@ -76,18 +76,19 @@ class Vqls:
                 #     params, system_qubits
                 # ),
                 # ansatz=lambda: ansatz_2_enhanced(params, system_qubits),
-                ansatz=lambda: ansatz_2_efficient(params, system_qubits),
+                ansatz=lambda: apply_vqls_2_qubit_pauli_ansatz(params, system_qubits, self.probs),
                 block_encoding=lambda: lcu_pauli(
                     operator=self.pauli_terms_structs,
                     data=system_qubits,
                     block=ancillary_qubits,
                 ),
-                prepare_b_state=lambda: inplace_prepare_state(
-                    probabilities=self.probs,
-                    bound=0.01,
-                    target=system_qubits,
-                ),
+                # prepare_b_state=lambda: inplace_prepare_state(
+                #     probabilities=self.probs,
+                #     bound=0.01,
+                #     target=system_qubits,
+                # ),
                 # prepare_b_state=lambda: apply_to_all(H, system_qubits),
+                # prepare_b_state=None
             )
 
         self.qprog_2 = synthesize(main, auto_show=False)
@@ -125,7 +126,8 @@ class Vqls:
             #     list(optimal_params.values()), io
             #         )
             # ansatz_2_enhanced(list(optimal_params.values()), io)
-            ansatz_2_efficient(list(optimal_params.values()), io)
+            # ansatz_2_efficient(list(optimal_params.values()), io)
+            apply_vqls_2_qubit_pauli_ansatz(list(optimal_params.values()), io, self.probs)
 
             # apply_improved_2_qubit_ansatz(
             #     list(optimal_params.values()), io

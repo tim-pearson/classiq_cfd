@@ -1,4 +1,6 @@
 import os
+import classiq
+# classiq.authenticate(overwrite=True)
 
 from classiq.applications.hamiltonian.pauli_decomposition import (
     hamiltonian_to_matrix,
@@ -34,7 +36,9 @@ p, A_num = create_poisson_matrix_pauli(2)
 print("Poisson matrix:")
 print(A_num)
 
-b = generate_guaranteed_b(A_num, seed=2)
+print(f"Paulis: {p}")
+
+b = generate_guaranteed_b(A_num, seed=32)
 print(f"b vector: {b}")
 
 # Classical solution
@@ -48,12 +52,13 @@ Ax_classical = A_num.dot(x_classical)
 print(f"A @ x_classical: {Ax_classical}")
 print(f"Should equal b:  {b}")
 print(f"Verification error: {np.linalg.norm(Ax_classical - b):.2e}")
+# %%
 
 # Normalized versions for comparison
 x_classical_normalized = x_classical / np.linalg.norm(x_classical)
 
 # VQLS setup
-ansatz_param_count = 8
+ansatz_param_count = 7
 num_system_qubits = p.num_qubits
 
 # %%
@@ -123,3 +128,9 @@ print("="*50)
 print(f"A @ x_classical: {A_num.dot(x_classical)}")
 print(f"b:               {b}")
 print(f"Match: {np.allclose(A_num.dot(x_classical), b, atol=1e-10)}")
+
+# %%
+
+print("A @ x_vqls:", A_num.dot(x_vqls_normalized))
+print("Normalized:", A_num.dot(x_vqls_normalized)/np.linalg.norm(A_num.dot(x_vqls_normalized)))
+print("b:", b)

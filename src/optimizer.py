@@ -79,11 +79,10 @@ class VqlsOptimizer:
     def optimize(self):
         random.seed(1000)
 
+        
         initial_params = [
-            float(random.randint(-314, 314))
-            / 1000  # Range: -0.314 to 0.314 radians
-            for _ in range(self.ansatz_param_count)
-        ]
+                float(random.uniform(-0.05, 0.05)) for _ in range(self.ansatz_param_count)
+            ]
 
         print(f"Initial parameters: {initial_params}")
 
