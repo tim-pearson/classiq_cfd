@@ -66,8 +66,16 @@ pauli_pressure = (
     - 0.25 * Pauli.X(0) * Pauli.I(1)  # flips qubit 0 → connects |00>↔|10>, |01>↔|11>
     - 0.5 * Pauli.I(0) * Pauli.X(1)  # flips qubit 1 → connects |00>↔|01>, |10>↔|11>
 )
+
+H_poisson = (
+    2.0 * Pauli.I(1) * Pauli.I(0)
+    - 1.0 * Pauli.I(1) * Pauli.X(0)
+    - 0.5 * Pauli.X(1) * Pauli.X(0)
+    - 0.5 * Pauli.Y(1) * Pauli.Y(0)
+)
 # %%
-m = hamiltonian_to_matrix(pauli_pressure)
+m = hamiltonian_to_matrix(H_poisson)
+m.real
 # %%
 # b = np.array([0.2, 0.1, 0.3, 0.15, 0.05, 0.1, 0.05, 0.05])
 # b /= np.linalg.norm(b)
@@ -77,17 +85,17 @@ b_physical = np.array([0.25, 0.001, 0.001, 0.45])
 b_physical /= np.linalg.norm(b_physical)  # normalize for quantum state
 
 # %%
-A = hamiltonian_to_matrix(pauli_pressure)
+A = hamiltonian_to_matrix(H_poisson)
 np.real(A)
 print(np.linalg.inv(A)@ b)
 # %%
 ansatz_param_count = 9
-vqls = Vqls(ansatz_param_count, pauli_pressure, b_physical, "2x2 pressure b with 0.001's")
+vqls = Vqls(ansatz_param_count, H_poisson, b_physical, "2x2 pressure b with 0.001's")
 # %%
 print("creating qprog")
 vqls.create_qrog()
 print("init optimizer")
-vqls.init_optimizer(2048, backend_preferences=backend_preferences)
+vqls.init_optimizer(20480, backend_preferences=backend_preferences)
 print("optimizing")
 optimal_params = vqls.optimizer.optimize()
 print("evalutating ansatz")
